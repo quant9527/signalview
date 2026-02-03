@@ -1,0 +1,8 @@
+[server]
+# Disable automatic page discovery from pages/ folder
+# This allows st.navigation() to control the navigation
+runOnSave = true
+
+[client]
+# Show error details for debugging
+showErrorDetails = true

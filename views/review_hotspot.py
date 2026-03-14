@@ -32,14 +32,6 @@ if df.empty:
 # 配置区域 - 可调整的信号名称
 # ============================================================================
 
-# 指数代码列表 - 用于在最开始显示
-INDEX_SYMBOLS = [
-    'sh000001',  # 上证指数
-    'sh000300',    # 沪深300
-    'sz399001',  # 深证成指
-    'sz399006',    # 创业板指
-]
-
 # 可配置的信号列表 - 用于识别"板块反弹急先锋"模式
 REBOUND_PIONEER_SIGNALS = [
     'cmp_rebound_pioneer_ma5ma10',  # 板块反弹急先锋信号
@@ -76,21 +68,6 @@ if 'signal_date' in df.columns:
             (df['signal_date'].dt.date <= date_range[1])].copy()
     
     st.info(f"📅 显示 {date_range[0]} 至 {date_range[1]} 的信号")
-
-st.divider()
-
-# ============================================================================
-# 第〇部分：指数信号 (Index Signals) - 多视图模式
-# ============================================================================
-st.subheader("📈 指数信号 (Index Signals)")
-
-# 筛选指数数据
-index_df = df[df['symbol'].isin(INDEX_SYMBOLS)].copy()
-
-if index_df.empty:
-    st.info(f"未找到指数信号 ({', '.join(INDEX_SYMBOLS)})")
-else:
-    display_signals_multiview(index_df, height=400)
 
 st.divider()
 
@@ -151,31 +128,8 @@ else:
             ])
             st.metric("🔥 近3日新增", recent_count)
     
-    # 显示数据表
-    # 添加 display_symbol 列用于显示
-    if 'display_symbol' not in symbol_signal_summary.columns:
-        symbol_signal_summary = symbol_signal_summary.merge(
-            pattern_df[['symbol', 'display_symbol']].drop_duplicates('symbol'),
-            on='symbol', how='left'
-        )
-    
-    display_cols = ['display_symbol', 'symbol_name', 'exchange', 'signals_str', 'signal_types', 'last_signal', 'signal_count']
-    available_cols = [col for col in display_cols if col in symbol_signal_summary.columns]
-    
-    st.dataframe(
-        symbol_signal_summary[available_cols].rename(columns={
-            'display_symbol': '代码',
-            'symbol_name': '名称', 
-            'exchange': '市场',
-            'signals_str': '信号组合',
-            'signal_types': '信号种类',
-            'last_signal': '最新信号时间',
-            'signal_count': '信号次数'
-        }),
-        width='stretch',
-        hide_index=True,
-        height=400
-    )
+    # 多视图模式显示（Symbol优先 + 信号优先 + 按周期）
+    display_signals_multiview(pattern_df, height=400, show_stats=False)
 
 st.divider()
 
@@ -207,8 +161,12 @@ else:
         if not sector_signals.empty:
             sector_name = sector_signals['symbol_name'].iloc[0] if 'symbol_name' in sector_signals.columns else sector_symbol
             signal_names = sector_signals['signal_name'].unique().tolist()
-            
-            with st.expander(f"📁 **{sector_symbol} - {sector_name}** ({len(signal_names)}个信号)", expanded=False):
+            first_ts = sector_signals['signal_date'].min()
+            last_ts = sector_signals['signal_date'].max()
+            first_str = first_ts.strftime('%Y-%m-%d') if pd.notna(first_ts) else '—'
+            last_str = last_ts.strftime('%Y-%m-%d') if pd.notna(last_ts) else '—'
+            time_range = f" | 首个 {first_str} → 最后 {last_str}"
+            with st.expander(f"📁 **{sector_symbol} - {sector_name}** ({len(signal_names)}个信号){time_range}", expanded=False):
                 st.write("**板块信号：**")
                 
                 # 显示板块信号详情

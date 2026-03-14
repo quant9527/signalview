@@ -13,6 +13,7 @@ pages = {
         st.Page("views/dashboard_em.py", title="EM", icon="🌍"),
     ],
     "Profit Patterns": [
+        st.Page("views/review_index.py", title="大盘", icon="📈"),
         st.Page("views/review_hotspot.py", title="Hotspot", icon="🔥", default=True),
         st.Page("views/active_vol_then_nested_bc.py", title="active_vol_then_nested_bc", icon="📉"),
         st.Page("views/profit_pattern_cl3b_zsx.py", title="CL3B ZSX", icon="📈"),

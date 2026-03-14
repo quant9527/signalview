@@ -129,10 +129,10 @@ else:
     symbol_signal_summary['signals_str'] = symbol_signal_summary['signals'].apply(lambda x: ', '.join(x))
     symbol_signal_summary['signal_types'] = symbol_signal_summary['signals'].apply(len)
     
-    # 优先显示信号类型多的（可能同时有多个模式信号）
+    # 按最新信号时间排序（最新的在前），同一天再按信号种类数、代码排序
     symbol_signal_summary = symbol_signal_summary.sort_values(
-        ['signal_types', 'last_signal'], 
-        ascending=[False, False]
+        ['last_signal', 'signal_types', 'symbol'],
+        ascending=[False, False, True]
     )
     
     # 显示核心统计
@@ -180,48 +180,23 @@ else:
 st.divider()
 
 # ============================================================================
-# 第二部分：信号时序分析
+# 第二部分：板块视角分析（exchange='em'）
 # ============================================================================
-st.subheader("2️⃣ 信号时序分析")
-
-if not pattern_df.empty and 'signal_date' in pattern_df.columns:
-    # 按日期统计信号数量
-    daily_signals = pattern_df.groupby([
-        pattern_df['signal_date'].dt.date, 
-        'signal_name'
-    ]).size().reset_index(name='count')
-    daily_signals.columns = ['date', 'signal_name', 'count']
-    
-    # 透视表显示
-    pivot_df = daily_signals.pivot(index='date', columns='signal_name', values='count').fillna(0)
-    pivot_df = pivot_df.sort_index(ascending=False)
-    
-    st.write("**每日信号分布：**")
-    st.dataframe(pivot_df, width='stretch', height=300)
-    
-    # 简单趋势图
-    st.write("**信号趋势：**")
-    total_daily = pattern_df.groupby(pattern_df['signal_date'].dt.date).size().reset_index(name='count')
-    total_daily.columns = ['date', 'count']
-    # 将日期转换为字符串格式，避免英文日期显示
-    total_daily['date'] = total_daily['date'].apply(lambda x: x.strftime('%Y-%m-%d'))
-    st.line_chart(total_daily.set_index('date')['count'])
-
-st.divider()
-
-# ============================================================================
-# 第三部分：板块视角分析（exchange='em'）
-# ============================================================================
-st.subheader("3️⃣ 板块热点与成分股联动")
+st.subheader("2️⃣ 板块热点与成分股联动")
 
 sector_df = pattern_df[pattern_df['exchange'].isin(SECTOR_EXCHANGES)].copy()
 
 if sector_df.empty:
     st.info(f"未找到板块(exchange={SECTOR_EXCHANGES})相关信号")
 else:
-    # 按最新信号时间排序板块（最新的优先显示）
-    sector_latest = sector_df.groupby('symbol')['signal_date'].max().reset_index()
-    sector_latest = sector_latest.sort_values('signal_date', ascending=False)
+    # 按最新信号时间排序板块（最新的优先显示）；统一为 datetime 避免时区/字符串导致排序错乱
+    sector_df = sector_df.copy()
+    sector_df['signal_date'] = pd.to_datetime(sector_df['signal_date'], utc=False)
+    sector_latest = sector_df.groupby('symbol', as_index=False)['signal_date'].max()
+    sector_latest = sector_latest.sort_values(
+        ['signal_date', 'symbol'],
+        ascending=[False, True]
+    )
     sector_list = sector_latest['symbol'].tolist()
     
     st.write(f"发现 **{len(sector_list)}** 个板块有相关信号")

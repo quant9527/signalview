@@ -1,48 +1,9 @@
 import altair as alt
 import pandas as pd
 import streamlit as st
-import hashlib
 
 # Configure the page to use wide layout
 st.set_page_config(layout="wide")
-
-# Simple authentication system
-def check_password():
-    """Returns `True` if the user had the correct password."""
-
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        # In a real app, you would verify the password against a database or other secure storage
-        if st.session_state.get("password") == st.secrets["auth"]["password"]:  # Using secrets for password
-            st.session_state["authenticated"] = True
-        else:
-            st.session_state["authenticated"] = False
-
-    # Check if user is already authenticated in this session
-    if st.session_state.get("authenticated"):
-        return True
-
-    if "authenticated" not in st.session_state:
-        # First run, show the login form
-        st.title("🔐 Login")
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
-        st.write("*Please enter your password to access the application*")
-        return False
-    elif not st.session_state["authenticated"]:
-        # Password incorrect, show the form again
-        st.title("🔐 Login")
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
-        st.error("Incorrect password")
-        return False
-    else:
-        # Password correct
-        return True
-
-# Check if user is authenticated - stop here if not authenticated
-if not check_password():
-    st.stop()
-
-# === Everything below only runs after successful authentication ===
 
 # Define pages structure for top navigation
 pages = {
@@ -53,7 +14,7 @@ pages = {
     ],
     "Profit Patterns": [
         st.Page("views/review_hotspot.py", title="Hotspot", icon="🔥", default=True),
-        st.Page("views/profit_pattern_volume_pullback.py", title="爆量回调见底", icon="📉"),
+        st.Page("views/active_vol_then_nested_bc.py", title="active_vol_then_nested_bc", icon="📉"),
         st.Page("views/profit_pattern_cl3b_zsx.py", title="CL3B ZSX", icon="📈"),
     ],
     "Review": [
@@ -65,6 +26,7 @@ pages = {
     "Performance": [
         st.Page("views/performance_nested_2bc.py", title="Nested 2bc", icon="🔍"),
         st.Page("views/performance_nested_2bc_em.py", title="Nested 2bc EM", icon="🔍"),
+        st.Page("views/performance_pair_seg.py", title="Pair Seg", icon="📐"),
         st.Page("views/performance_cl3b_macd.py", title="CL3B MACD", icon="📈"),
         st.Page("views/performance_cmp_em.py", title="CMP EM", icon="📊"),
     ],
@@ -75,30 +37,41 @@ pages = {
     ],
 }
 
-# Run navigation with top position - only after authentication
+# Run navigation with top position
 pg = st.navigation(pages, position="top")
 
 
 # Create a database connection using Streamlit's connection API
+def _get_conn_str():
+    """Get PostgreSQL connection string from secrets or environment."""
+    import os
+    try:
+        return st.secrets["connections"]["quantdb"]["url"]
+    except (KeyError, FileNotFoundError, Exception):
+        pass
+    return os.environ.get("POSTGRESQL_URL") or os.environ.get("DATABASE_URL")
+
+
 @st.cache_resource
 def get_connection():
     """Create a database connection using Streamlit's connection API."""
+    import os
     import streamlit as st
     import psycopg
 
-    # For Streamlit's SQLConnection implementation, we can use the built-in SQLConnection
-    # if available, otherwise we'll create a custom implementation
+    conn_str = _get_conn_str()
+    if not conn_str:
+        st.error(
+            "未配置数据库连接。请任选其一：\n"
+            "1. 复制 `.streamlit/secrets.toml.example` 为 `.streamlit/secrets.toml` 并填入 `[connections.quantdb] url`\n"
+            "2. 或设置环境变量 `POSTGRESQL_URL` 或 `DATABASE_URL`"
+        )
+        st.stop()
+
     try:
-        # Try to use Streamlit's built-in SQLConnection if available
         from streamlit.connections import SQLConnection
-        # Read connection string from secrets.toml
-        conn_str = st.secrets["connections"]["postgresql"]["url"]
-        return st.connection('postgresql', type=SQLConnection, url=conn_str)
-    except:
-        # Fallback: Create a custom connection approach
-        # Since we can't use SQLConnection directly, we'll use a cached psycopg connection
-        # Read connection details from secrets.toml
-        conn_str = st.secrets["connections"]["postgresql"]["url"]
+        return st.connection('quantdb', type=SQLConnection, url=conn_str)
+    except Exception:
         return psycopg.connect(conn_str)
 
 # Import the centralized load_data function
@@ -140,6 +113,19 @@ with st.sidebar:
         days_map = {"10 days": 10, "45 days (default)": 45, "90 days": 90}
         days = days_map.get(time_option, 45)
         df = load_data(time_window_days=days)
+
+# 确保 Performance 子页用到的信号在数据中（否则「Select signals」无对应选项）
+PERFORMANCE_SIGNAL_PREFIXES = ["nested_2bc", "pair_seg", "cl3b_macd", "cmp_em"]
+all_signal_names = set(df["signal_name"].dropna().unique())
+for prefix in PERFORMANCE_SIGNAL_PREFIXES:
+    if not any(str(s).startswith(prefix) for s in all_signal_names):
+        if time_option == "Custom range":
+            df_extra = load_data(time_window_days=None, start_date=start_str, end_date=end_str, signal_name_prefix=prefix)
+        else:
+            _days = days_map.get(time_option, 45)
+            df_extra = load_data(time_window_days=_days, signal_name_prefix=prefix)
+        if not df_extra.empty:
+            df = pd.concat([df, df_extra]).drop_duplicates()
 
 # Signals multiselect - shared across all pages
 with st.sidebar:

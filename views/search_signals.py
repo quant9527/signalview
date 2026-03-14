@@ -338,12 +338,3 @@ else:
         width='stretch',
         hide_index=True
     )
-
-# Add CSV export functionality
-csv = filtered_df.to_csv(index=False)
-st.download_button(
-    "Export Search Results to CSV",
-    csv,
-    file_name=f"search_results_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-    mime="text/csv"
-)

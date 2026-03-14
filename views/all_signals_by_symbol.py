@@ -99,12 +99,5 @@ if "symbol" in df.columns and not df.empty:
             avg_signals = summary_df["total_signals"].mean() if "total_signals" in summary_df.columns else 0
             st.metric("Avg. Signals per Symbol", f"{avg_signals:.1f}")
     
-    # Export option
-    csv = summary_df.to_csv(index=False)
-    st.download_button(
-        "Export All Signals by Symbol (CSV)", 
-        csv, 
-        file_name="all_signals_by_symbol.csv"
-    )
 else:
     st.warning("No symbols found in the data.")

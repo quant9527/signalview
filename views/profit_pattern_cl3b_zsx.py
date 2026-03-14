@@ -138,9 +138,9 @@ if not filtered_df.empty and 'signal_date' in filtered_df.columns:
         st.write("**每日信号分布（按周期）：**")
         st.dataframe(pivot_df, width='stretch', height=300)
         
-        # 趋势图
+        # 趋势图（柱状）
         st.write("**信号趋势：**")
-        st.line_chart(pivot_df)
+        st.bar_chart(pivot_df)
     else:
         daily_signals = filtered_df.groupby(
             filtered_df['signal_date'].dt.date
@@ -152,17 +152,5 @@ if not filtered_df.empty and 'signal_date' in filtered_df.columns:
         st.dataframe(daily_signals, width='stretch', height=300)
         
         st.write("**信号趋势：**")
-        st.line_chart(daily_signals)
+        st.bar_chart(daily_signals)
 
-st.divider()
-
-# ============================================================================
-# 导出功能
-# ============================================================================
-csv = filtered_df.to_csv(index=False)
-st.download_button(
-    "📥 导出数据",
-    csv,
-    file_name=f"profit_pattern_cl3b_zsx_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-    mime="text/csv"
-)

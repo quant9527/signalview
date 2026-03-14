@@ -94,11 +94,30 @@ elif exchange_option == EXCHANGE_BINANCE:
     st.warning("Binance exchange not yet implemented")
     st.stop()
 else:
-    source_param = "spot_em"
+    # A 股：可选 akshare 或 Flight (quant-lab) 作为最新价数据源
+    price_sources = [
+        ("akshare (东方财富)", "spot_em", None),
+        ("Flight (quant-lab)", "flight", "symbols"),
+    ]
+    source_labels = [p[0] for p in price_sources]
+    default_idx = 0
+    price_source_label = st.selectbox(
+        "最新价数据源",
+        options=source_labels,
+        index=default_idx,
+        help="akshare 拉全市场；Flight 仅拉当前筛选出的标的（需 quant-lab 服务运行在 127.0.0.1:50001）",
+    )
+    source_param = price_sources[source_labels.index(price_source_label)][1]
+    needs_symbols = price_sources[source_labels.index(price_source_label)][2] == "symbols"
     if st.button("Refresh latest prices"):
         get_latest_market.clear()
         st.rerun()
-    market_df = get_latest_market(source_param)
+    symbols_for_flight = df["symbol"].astype(str).str.strip().str.replace(r"\.[A-Za-z]+$", "", regex=True).str.zfill(6).unique().tolist()
+    if needs_symbols:
+        market_df = get_latest_market(source_param, symbols=tuple(symbols_for_flight))
+    else:
+        # 传 symbols 以便 akshare 失败时自动 fallback 到 Flight
+        market_df = get_latest_market(source_param, symbols=tuple(symbols_for_flight))
 if market_df.empty:
     st.info("Failed to fetch latest market data. Try again later or check network/akshare")
     st.stop()
@@ -142,15 +161,39 @@ market_df2 = market_df2.rename(columns={code_col: "symbol_market", price_col: "l
 if change_col in market_df.columns:
     market_df2 = market_df2.rename(columns={change_col: "market_pct_change"})
 
-market_df2["symbol_market"] = market_df2["symbol_market"].astype(str).str.zfill(6)
-df_latest["symbol"] = df_latest["symbol"].astype(str).str.zfill(6)
+# 统一为可比较的代码格式：去掉 sh/sz 前缀、.SH/.SZ 后缀，再补零到 6 位（东方财富/新浪/Flight 一致）
+def _normalize_symbol(s: pd.Series) -> pd.Series:
+    s = s.astype(str).str.strip()
+    # 新浪等：去掉 sh/sz 前缀（不区分大小写）
+    s = s.str.replace(r"^[sS][hH]|^[sS][zZ]", "", regex=True)
+    # 去掉 .SH / .SZ / .BJ 等后缀
+    s = s.str.replace(r"\.[A-Za-z]+$", "", regex=True)
+    s = s.str.replace(r"^\s+|\s+$", "", regex=True)
+    return s.str.zfill(6)
 
-merged = pd.merge(df_latest, market_df2, left_on="symbol", right_on="symbol_market", how="left")
+market_df2["symbol_market"] = _normalize_symbol(market_df2["symbol_market"].copy())
+# A 股(as)时只保留沪市/深市 6 位代码，排除北交所 bj 等前缀
+if exchange_option == EXCHANGE_AS:
+    market_df2 = market_df2[market_df2["symbol_market"].str.match(r"^\d{6}$", na=False)].copy()
 
-# Debug: check merge results
+df_latest["symbol_normalized"] = _normalize_symbol(df_latest["symbol"].copy())
+
+merged = pd.merge(df_latest, market_df2, left_on="symbol_normalized", right_on="symbol_market", how="left")
+
+# Debug: 无匹配时给出可操作的排查信息
 if merged["latest_price"].isna().all():
-    st.warning(f"⚠️ No price matches found. Sample symbols from signals: {df_latest['symbol'].head(5).tolist()} | Sample codes from market: {market_df2['symbol_market'].head(5).tolist()}")
-    st.info(f"Exchange: {exchange_option} | Signal symbols are stock codes, but exchange may use different code format (e.g., board codes for EM/THS)")
+    sample_signals = df_latest["symbol"].astype(str).head(10).tolist()
+    sample_normalized = df_latest["symbol_normalized"].head(10).tolist()
+    sample_market = market_df2["symbol_market"].head(10).tolist()
+    st.warning(
+        f"⚠️ No price matches found.\n\n"
+        f"**Signal symbols (raw):** `{sample_signals}`\n\n"
+        f"**Signal symbols (normalized to 6-digit):** `{sample_normalized}`\n\n"
+        f"**Market codes (sample):** `{sample_market}`\n\n"
+        f"Exchange: `{exchange_option}`. For A-share (as), market data is 6-digit stock codes; "
+        f"if your DB stores symbols with suffix (e.g. 600519.SH), they are now normalized. "
+        f"If still no match, check that symbols are A-share codes and exchange is 'as'."
+    )
     
 # Calculate performance metrics using the reusable function
 merged = calculate_performance_metrics(merged)
@@ -172,7 +215,7 @@ display_show = display_df[cols_available].copy()
 
 rename_map = {}
 if "market_pct_change" in display_show.columns:
-    rename_map["market_pct_change"] = "Market change (%)"
+    rename_map["market_pct_change"] = "当日涨幅 (%)"
 if "all_signals" in display_show.columns:
     rename_map["all_signals"] = "All Signals (by date)"
 if "all_signals_count" in display_show.columns:
@@ -189,6 +232,3 @@ other_cols = [c for c in display_show.columns if c not in desired_front]
 display_show = display_show[desired_front + other_cols]
 
 st.dataframe(display_show, width="stretch")
-
-csv = display_df[cols_available].to_csv(index=False)
-st.download_button("Export CSV", csv, file_name="signal_performance_vs_current.csv")

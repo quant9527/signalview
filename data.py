@@ -103,89 +103,221 @@ def calculate_performance_metrics(merged_df):
     return merged_df
 
 
+def _get_latest_market_flight(symbols: list, exchange: str = "as", flight_url: str = "grpc://127.0.0.1:50001") -> pd.DataFrame:
+    """
+    通过 quant-lab Flight 服务拉取 K 线，取每只标的最近一根的 close 作为最新价。
+    接口约定与 quant-lab/quant/data.py 的 get_flight(kline) 一致。
+    """
+    import json
+    import re
+    from datetime import datetime, timedelta
+
+    if not symbols:
+        return pd.DataFrame(columns=["code", "price", "change_percent"])
+
+    try:
+        from pyarrow import flight
+    except ImportError:
+        return pd.DataFrame(columns=["code", "price", "change_percent"])
+
+    # 与 quant-lab 一致：tag = exchange_symbol_freq，如 as_600519_1d
+    def _norm(s):
+        s = str(s).strip()
+        s = re.sub(r"\.[A-Za-z]+$", "", s)
+        return s.zfill(6) if s else ""
+
+    symbols_6 = [_norm(s) for s in symbols if _norm(s)]
+    tags = [f"{exchange}_{s}_1d" for s in symbols_6]
+    end_ts = int(datetime.now().timestamp() * 1000)
+    start_ts = int((datetime.now() - timedelta(days=5)).timestamp() * 1000)
+    req = {
+        "name": "kline",
+        "start_time": start_ts,
+        "end_time": end_ts,
+        "tags": tags,
+        "kline_aggregate": "",
+        "kline_reverse": False,
+    }
+    try:
+        client = flight.FlightClient(flight_url)
+        ticket = flight.Ticket(json.dumps(req))
+        reader = client.do_get(ticket)
+        kline_df = reader.read_pandas()
+    except Exception as e:
+        print(f"[Flight] get_latest_market_flight failed: {e}")
+        return pd.DataFrame(columns=["code", "price", "change_percent"])
+
+    if kline_df is None or kline_df.empty:
+        return pd.DataFrame(columns=["code", "price", "change_percent"])
+
+    close_col = "close" if "close" in kline_df.columns else "Close"
+    if close_col not in kline_df.columns:
+        return pd.DataFrame(columns=["code", "price", "change_percent"])
+
+    # 取每个 (exchange, symbol) 最新一根的 close
+    ts_col = "end_ts" if "end_ts" in kline_df.columns else "timestamp"
+    if ts_col not in kline_df.columns and "datetime" in kline_df.columns:
+        kline_df = kline_df.sort_values("datetime", ascending=True)
+        latest = kline_df.groupby(["exchange", "symbol"], as_index=False).last()
+    else:
+        if ts_col in kline_df.columns:
+            kline_df = kline_df.sort_values(ts_col, ascending=True)
+        latest = kline_df.groupby(["exchange", "symbol"], as_index=False).last()
+
+    latest = latest.rename(columns={"symbol": "code", close_col: "price"})
+    if "code" not in latest.columns and "symbol" in latest.columns:
+        latest["code"] = latest["symbol"]
+    latest["price"] = pd.to_numeric(latest["price"], errors="coerce")
+
+    # 涨跌幅：若有前收，则 (price - prev_close) / prev_close * 100
+    change_pct = []
+    for _, row in latest.iterrows():
+        ex, sym = row.get("exchange", exchange), row.get("code", row.get("symbol", ""))
+        sub = kline_df[(kline_df["exchange"] == ex) & (kline_df["symbol"] == sym)]
+        if ts_col in sub.columns:
+            sub = sub.sort_values(ts_col)
+        if len(sub) >= 2:
+            prev = sub[close_col].iloc[-2]
+            curr = sub[close_col].iloc[-1]
+            change_pct.append(100.0 * (curr - prev) / prev if prev and prev != 0 else None)
+        else:
+            change_pct.append(None)
+    latest["change_percent"] = change_pct
+
+    return latest[["code", "price", "change_percent"]].copy()
+
+
 @st.cache_data(ttl=600, show_spinner=False)
-def get_latest_market(source: str = "spot_em"):
+def get_latest_market(source: str = "spot_em", symbols: list | None = None):
+    """
+    获取最新行情。source: "spot_em" | "spot" | "flight"。
+    当 source=="flight" 时，symbols 必填，从 quant-lab Flight 服务拉取 A 股最新价。
+    """
     import akshare as ak
     import pandas as pd
-    
+    import os
+
     def _find_column(df, candidates):
         for c in candidates:
             if c in df.columns:
                 return c
         return None
-    
-    sources = ["spot_em", "spot"] if source == "spot_em" else ["spot", "spot_em"]
-    
+
+    if source == "flight":
+        with st.spinner("Fetching latest prices from Flight (quant-lab)..."):
+            flight_url = os.environ.get("FLIGHT_URL", "grpc://127.0.0.1:50001")
+            return _get_latest_market_flight(symbols or [], exchange="as", flight_url=flight_url)
+
+    # 多数据源依次尝试：东方财富(重试) -> 新浪 -> Flight(若传入 symbols)
+    def _normalize_market_df(market_df):
+        code_col = _find_column(market_df, ["代码", "symbol", "code"])
+        price_col = _find_column(market_df, ["最新价", "现价", "price", "trade", "now"])
+        change_col = _find_column(market_df, ["涨跌幅", "涨跌额", "涨跌%", "pct_chg", "change_percent", "changepercent", "change"])
+        rename_map = {}
+        if code_col:
+            rename_map[code_col] = "code"
+        if price_col:
+            rename_map[price_col] = "price"
+        if change_col:
+            rename_map[change_col] = "change_percent"
+        if rename_map:
+            market_df = market_df.rename(columns=rename_map)
+        return market_df
+
     with st.spinner("Fetching latest market prices..."):
-        for src in sources:
+        import time
+        last_err = None
+        # 1) 东方财富
+        for attempt in range(3):
             try:
-                if src == "spot_em":
-                    market_df = ak.stock_zh_a_spot_em()
-                    # Normalize column names for spot_em
-                    code_col = _find_column(market_df, ["代码", "symbol", "code"])
-                    price_col = _find_column(market_df, ["最新价", "现价", "price", "now"])
-                    change_col = _find_column(market_df, ["涨跌幅", "涨跌额", "涨跌%", "pct_chg", "change_percent", "change"])
-                else:
-                    market_df = ak.stock_zh_a_spot()
-                    # Normalize column names for spot
-                    code_col = _find_column(market_df, ["code", "代码", "symbol"])
-                    price_col = _find_column(market_df, ["trade", "最新价", "现价", "price", "now"])
-                    change_col = _find_column(market_df, ["changepercent", "涨跌幅", "涨跌额", "涨跌%", "pct_chg", "change_percent", "change"])
-                
-                # Rename columns to standard names
-                rename_map = {}
-                if code_col:
-                    rename_map[code_col] = "code"
-                if price_col:
-                    rename_map[price_col] = "price"
-                if change_col:
-                    rename_map[change_col] = "change_percent"
-                
-                if rename_map:
-                    market_df = market_df.rename(columns=rename_map)
-                
-                return market_df
+                if attempt > 0:
+                    time.sleep(2)
+                market_df = ak.stock_zh_a_spot_em()
+                if market_df is not None and not market_df.empty:
+                    return _normalize_market_df(market_df)
             except Exception as e:
-                if src == sources[-1]:
-                    st.error(f"Failed to fetch market data from all sources.")
-                    st.exception(e)
-                else:
+                last_err = e
+                if attempt < 2:
                     continue
-    
+        # 2) 新浪 A 股实时行情（常返回 HTML 导致 JSONDecodeError，仅作 fallback）
+        try:
+            time.sleep(1)
+            market_df = ak.stock_zh_a_spot()
+            if market_df is not None and not market_df.empty:
+                st.info("东方财富不可用，已改用新浪数据源。")
+                return _normalize_market_df(market_df)
+        except Exception as e:
+            last_err = e
+        # 3) Flight
+        if symbols and len(symbols) > 0:
+            flight_url = os.environ.get("FLIGHT_URL", "grpc://127.0.0.1:50001")
+            fallback_df = _get_latest_market_flight(list(symbols), exchange="as", flight_url=flight_url)
+            if not fallback_df.empty:
+                st.info("东方财富/新浪均不可用，已自动改用 Flight 数据源。")
+                return fallback_df
+        st.error("获取 A 股行情失败，请稍后重试或切换为「最新价数据源 → Flight (quant-lab)」。")
+        if last_err:
+            st.exception(last_err)
     return pd.DataFrame()
 
 
+def _print_sql(query: str, params: tuple | list | None = None):
+    """执行前打印 SQL（便于调试）。"""
+    if params:
+        print("[SQL]", query.strip(), "| params:", params)
+    else:
+        print("[SQL]", query.strip())
+
+
 @st.cache_data(ttl=600, show_spinner="正在连接数据库（Neon 冷启动可能需要 1-2 分钟）...")
-def load_data(time_window_days: int = 30, start_date: str | None = None, end_date: str | None = None):
-    """Load signals from the database filtered by a time window."""
+def load_data(time_window_days: int = 30, start_date: str | None = None, end_date: str | None = None, signal_name_prefix: str | None = None):
+    """Load signals from the database filtered by a time window. Optional signal_name_prefix filters by signal_name LIKE prefix%."""
     from utils import normalize_signal_date_field
     import psycopg
     
-    conn_str = st.secrets["connections"]["postgresql"]["url"]
+    conn_str = st.secrets["connections"]["quantdb"]["url"]
     
     try:
         with psycopg.connect(conn_str, connect_timeout=120) as conn:
             with conn.cursor() as cur:
                 # 不查询 debug_info 字段，该字段数据量太大会导致传输极慢
                 columns = "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, signal_date, signal_name, signal, reason, price, score, shares, version, created_at, updated_at, reverse"
+                signal_filter = " AND signal_name LIKE %s" if signal_name_prefix else ""
+                params: list = []
                 if start_date and end_date:
                     query = f"""
                     SELECT {columns}
                     FROM signal
                     WHERE signal_date >= %s
-                      AND signal_date < (%s::date + interval '1 day')
+                      AND signal_date < (%s::date + interval '1 day'){signal_filter}
                     ORDER BY signal_date DESC
                     """
-                    cur.execute(query, (start_date, end_date))
+                    params = [start_date, end_date]
+                    if signal_name_prefix:
+                        params.append(signal_name_prefix + "%")
+                    _print_sql(query, params)
+                    cur.execute(query, params)
                 else:
                     ndays = int(time_window_days) if time_window_days is not None else 30
-                    query = f"""
-                    SELECT {columns}
-                    FROM signal
-                    WHERE signal_date >= now() - interval '{ndays} days'
-                    ORDER BY signal_date DESC
-                    """
-                    cur.execute(query)
+                    if signal_name_prefix:
+                        query = f"""
+                        SELECT {columns}
+                        FROM signal
+                        WHERE signal_date >= now() - interval '{ndays} days'
+                          AND signal_name LIKE %s
+                        ORDER BY signal_date DESC
+                        """
+                        _print_sql(query, (signal_name_prefix + "%",))
+                        cur.execute(query, (signal_name_prefix + "%",))
+                    else:
+                        query = f"""
+                        SELECT {columns}
+                        FROM signal
+                        WHERE signal_date >= now() - interval '{ndays} days'
+                        ORDER BY signal_date DESC
+                        """
+                        _print_sql(query)
+                        cur.execute(query)
 
                 rows = cur.fetchall()
                 colnames = [desc[0] for desc in cur.description]
@@ -217,23 +349,25 @@ def get_sector_constituents_from_db(sector_symbol: str, sector_exchange: str = '
     Returns:
         List of stock symbols that are constituents of the sector
     """
-    conn_str = st.secrets["connections"]["postgresql"]["url"]
+    conn_str = st.secrets["connections"]["quantdb"]["url"]
     try:
         import psycopg
         
         with psycopg.connect(conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT DISTINCT stock_symbol 
-                    FROM sector_constituent 
-                    WHERE sector_symbol = %s 
+                sector_sql = """
+                    SELECT DISTINCT stock_symbol
+                    FROM sector_constituent
+                    WHERE sector_symbol = %s
                       AND sector_exchange = %s
                       AND snapshot_date = (
-                          SELECT MAX(snapshot_date) 
-                          FROM sector_constituent 
+                          SELECT MAX(snapshot_date)
+                          FROM sector_constituent
                           WHERE sector_symbol = %s AND sector_exchange = %s
                       )
-                """, (sector_symbol, sector_exchange, sector_symbol, sector_exchange))
+                """
+                _print_sql(sector_sql, (sector_symbol, sector_exchange, sector_symbol, sector_exchange))
+                cur.execute(sector_sql, (sector_symbol, sector_exchange, sector_symbol, sector_exchange))
                 
                 rows = cur.fetchall()
                 return [row[0] for row in rows]

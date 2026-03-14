@@ -1,0 +1,57 @@
+# 构建并推送 signal-dashboard 镜像，对应 deploy/app/compose.yaml 中的 signal-dashboard 服务（8501）
+# 参考 infra 项目的 action 写法；镜像可用于 compose 的 IMAGE_TAG_FOR_signaldashboard
+name: build-signaldashboard
+
+on:
+  push:
+    branches:
+      - '*'
+
+env:
+  APP_NAME: signaldashboard
+  DOCKER_REPO: signal-dataset
+
+permissions:
+  packages: write
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set outputs
+        id: vars
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >>$GITHUB_OUTPUT
+          echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >>$GITHUB_OUTPUT
+
+      - name: Set image tag
+        id: image_tag
+        run: |
+          echo "new_image_tag=${{ env.APP_NAME }}-${{ steps.vars.outputs.branch }}-${{ steps.vars.outputs.sha_short }}" >>$GITHUB_OUTPUT
+          echo "branch_sha=${{ steps.vars.outputs.branch }}-${{ steps.vars.outputs.sha_short }}" >>$GITHUB_OUTPUT
+
+      - id: build-push-image
+        uses: quant9527/deploy-action@main
+        with:
+          registry_username: ${{ vars.DOCKERHUB_USERNAME }}
+          registry_password: ${{ secrets.DOCKERHUB_TOKEN }}
+          tag: ${{ vars.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ steps.image_tag.outputs.new_image_tag }},${{ vars.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:latest
+          file: ./Dockerfile
+          platforms: linux/amd64
+
+      - run: echo new image is ${{ steps.build-push-image.outputs.new-image }}
+        shell: bash
+
+      - name: Invoke workflow in another repo with inputs
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: trigger-set-image.yml
+          repo: quant9527/deploy
+          inputs: '{ "repo":"${{ env.DOCKER_REPO }}" ,"chart": "${{ env.APP_NAME }}", "image": "${{ secrets.USERNAME }}/${{ github.event.repository.name }}", "sha-tag": "${{ steps.image_tag.outputs.new_image_tag }}","branch_sha": "${{ steps.image_tag.outputs.branch_sha }}" }'
+          token: ${{ secrets.WORKFLOW_ACCESS_ALL_MY_REPO }}

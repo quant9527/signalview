@@ -1,0 +1,11 @@
+.streamlit/secrets.toml
+.git
+.github
+.gitignore
+.dockerignore
+*.md
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.devcontainer

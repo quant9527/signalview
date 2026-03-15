@@ -18,26 +18,34 @@ def create_all_signals_columns(display_df, full_df, include_extra_info=False):
         # Sort the full dataframe by symbol and signal_date for chronological display
         df_sorted = full_df.sort_values(["symbol", "signal_date"], ascending=[True, False])
 
-        # Include signal_name, signal_date, and freq in the all_signals column
+        # Include signal_name, signal_date, and freq in the all_signals column（按 signal_name+signal_date+freq 去重，避免重复行刷屏）
         def format_signals(group):
+            key_cols = ["signal_name", "signal_date"]
+            if "freq" in group.columns:
+                key_cols.append("freq")
+            group = group.drop_duplicates(subset=key_cols)
             rows = []
             for _, row in group.iterrows():
                 # Format signal_date to be more readable
                 signal_date = row["signal_date"].strftime("%Y-%m-%d %H:%M:%S") if pd.notna(row["signal_date"]) else str(row["signal_date"])
                 signal_info = f"{row['signal_name']} | {signal_date}"
-                if not include_extra_info and 'freq' in df_sorted.columns and pd.notna(row['freq']):
-                    # This is the basic format for performance.py - just add freq without label
+                if not include_extra_info and 'freq' in group.columns and pd.notna(row.get('freq')):
                     signal_info += f" | {row['freq']}"
-                if include_extra_info and 'freq' in df_sorted.columns and pd.notna(row['freq']):
+                if include_extra_info and 'freq' in group.columns and pd.notna(row.get('freq')):
                     signal_info += f" | Freq: {row['freq']}"
-                if include_extra_info and 'price' in df_sorted.columns and pd.notna(row['price']):
+                if include_extra_info and 'price' in group.columns and pd.notna(row.get('price')):
                     signal_info += f" | Price: {row['price']}"
                 rows.append(signal_info)
             return "\n".join(rows)
 
         symbol_signals = df_sorted.groupby("symbol").apply(format_signals, include_groups=False).to_dict()
-        # Create a dictionary for signal counts as well
-        symbol_signal_counts = df_sorted.groupby("symbol")["signal_name"].count().to_dict()
+        # 去重后的条数作为 all_signals_count
+        def count_unique_signals(group):
+            key_cols = ["signal_name", "signal_date"]
+            if "freq" in group.columns:
+                key_cols.append("freq")
+            return group.drop_duplicates(subset=key_cols).shape[0]
+        symbol_signal_counts = df_sorted.groupby("symbol").apply(count_unique_signals, include_groups=False).to_dict()
 
         # Add the all_signals column to display_df
         display_df["all_signals"] = display_df["symbol"].map(symbol_signals).apply(lambda x: x if x is not None else "")
@@ -259,6 +267,66 @@ def get_latest_market(source: str = "spot_em", symbols: list | None = None):
         if last_err:
             st.exception(last_err)
     return pd.DataFrame()
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _get_latest_market_em():
+    """EM 板块（概念+行业）最新价，统一返回 code, price, change_percent。"""
+    import akshare as ak
+    concept_df = ak.stock_board_concept_name_em()
+    industry_df = ak.stock_board_industry_name_em()
+    concept_df = concept_df.rename(columns={"板块代码": "code", "板块名称": "name", "最新价": "price", "涨跌幅": "change_percent"})
+    industry_df = industry_df.rename(columns={"板块代码": "code", "板块名称": "name", "最新价": "price", "涨跌幅": "change_percent"})
+    return pd.concat([concept_df, industry_df], ignore_index=True)[["code", "price", "change_percent"]].copy()
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _get_latest_market_ths():
+    """同花顺板块最新价，统一返回 code, price, change_percent。"""
+    import akshare as ak
+    board_df = ak.stock_board_industry_summary_ths()
+    return board_df.rename(columns={"代码": "code", "名称": "name", "最新价": "price", "涨跌幅": "change_percent"})[["code", "price", "change_percent"]].copy()
+
+
+def get_latest_market_for_exchange(exchange: str, symbols: list | tuple | None = None, source_as: str = "spot_em") -> pd.DataFrame:
+    """
+    按 exchange 获取最新价，统一返回列：code, price, change_percent。
+    供 Performance 等页复用。所有 exchange 均支持：主源失败时用 Flight (quant-lab) 兜底（需传入 symbols）。
+    """
+    symbols = list(symbols) if isinstance(symbols, tuple) else (symbols or [])
+    if exchange == "as":
+        return get_latest_market(source_as, symbols=tuple(symbols) if symbols else None)
+    if exchange == "em":
+        if source_as == "flight" and symbols:
+            with st.spinner("Fetching latest prices from Flight (quant-lab)..."):
+                return _get_latest_market_flight(symbols, exchange="em")
+        with st.spinner("Fetching latest market prices..."):
+            try:
+                out = _get_latest_market_em()
+                if out is not None and not out.empty:
+                    return out
+            except Exception:
+                pass
+            if symbols:
+                st.info("东方财富板块不可用，已自动改用 Flight 数据源。")
+                return _get_latest_market_flight(symbols, exchange="em")
+        return pd.DataFrame(columns=["code", "price", "change_percent"])
+    if exchange == "ths":
+        if source_as == "flight" and symbols:
+            with st.spinner("Fetching latest prices from Flight (quant-lab)..."):
+                return _get_latest_market_flight(symbols, exchange="ths")
+        with st.spinner("Fetching latest market prices..."):
+            try:
+                out = _get_latest_market_ths()
+                if out is not None and not out.empty:
+                    return out
+            except Exception:
+                pass
+            if symbols:
+                st.info("同花顺板块不可用，已自动改用 Flight 数据源。")
+                return _get_latest_market_flight(symbols, exchange="ths")
+        return pd.DataFrame(columns=["code", "price", "change_percent"])
+    return pd.DataFrame(columns=["code", "price", "change_percent"])
 
 
 def _print_sql(query: str, params: tuple | list | None = None):

@@ -12,7 +12,7 @@ pages = {
         st.Page("views/dashboard_binance.py", title="Binance", icon="🪙"),
         st.Page("views/dashboard_em.py", title="EM", icon="🌍"),
     ],
-    "Profit Patterns": [
+    "AS": [
         st.Page("views/review_index.py", title="大盘", icon="📈"),
         st.Page("views/review_hotspot.py", title="Hotspot", icon="🔥", default=True),
         st.Page("views/active_vol_then_nested_bc.py", title="active_vol_then_nested_bc", icon="📉"),
@@ -29,7 +29,7 @@ pages = {
         st.Page("views/performance_nested_2bc_em.py", title="Nested 2bc EM", icon="🔍"),
         st.Page("views/performance_pair_seg.py", title="Pair Seg", icon="📐"),
         st.Page("views/performance_cl3b_macd.py", title="CL3B MACD", icon="📈"),
-        st.Page("views/performance_cmp_em.py", title="CMP EM", icon="📊"),
+        st.Page("views/performance_cmp_ths.py", title="CMP THS", icon="📊"),
     ],
     "Signals": [
         st.Page("views/all_signals_by_symbol.py", title="All Signals by Symbol", icon="📊"),

@@ -1,14 +1,14 @@
 import pandas as pd
 import streamlit as st
-from data import create_all_signals_columns, calculate_performance_metrics, get_latest_market
+from data import (
+    create_all_signals_columns,
+    calculate_performance_metrics,
+    get_latest_market_for_exchange,
+    get_latest_market,
+    _get_latest_market_em,
+    _get_latest_market_ths,
+)
 from constants import EXCHANGE_AS, EXCHANGE_EM, EXCHANGE_THS, EXCHANGE_BINANCE, EXCHANGE_OPTIONS
-
-
-def _find_column(df, candidates):
-    for c in candidates:
-        if c in df.columns:
-            return c
-    return None
 
 
 st.header("Signal Performance vs Current Prices — Ranking")
@@ -61,63 +61,53 @@ total_symbols = df['symbol'].nunique()
 total_records = len(df)
 st.info(f"📊 Selected signals: {total_signals} | Unique symbols: {total_symbols} | Total records: {total_records}")
 
-if exchange_option == EXCHANGE_EM:
-    import akshare as ak
-    if st.button("Refresh latest prices"):
-        st.cache_data.clear()
-        st.rerun()
-    
-    @st.cache_data(ttl=600)
-    def get_em_board_data():
-        concept_df = ak.stock_board_concept_name_em()
-        industry_df = ak.stock_board_industry_name_em()
-        concept_df = concept_df.rename(columns={"板块代码": "code", "板块名称": "name", "最新价": "price", "涨跌幅": "change_percent"})
-        industry_df = industry_df.rename(columns={"板块代码": "code", "板块名称": "name", "最新价": "price", "涨跌幅": "change_percent"})
-        return pd.concat([concept_df, industry_df], ignore_index=True)
-    
-    with st.spinner("Fetching latest market prices..."):
-        market_df = get_em_board_data()
-elif exchange_option == EXCHANGE_THS:
-    import akshare as ak
-    if st.button("Refresh latest prices"):
-        st.cache_data.clear()
-        st.rerun()
-    
-    @st.cache_data(ttl=600)
-    def get_ths_board_data():
-        board_df = ak.stock_board_industry_summary_ths()
-        return board_df.rename(columns={"代码": "code", "名称": "name", "最新价": "price", "涨跌幅": "change_percent"})
-    
-    with st.spinner("Fetching latest market prices..."):
-        market_df = get_ths_board_data()
-elif exchange_option == EXCHANGE_BINANCE:
+if exchange_option == EXCHANGE_BINANCE:
     st.warning("Binance exchange not yet implemented")
     st.stop()
-else:
-    # A 股：可选 akshare 或 Flight (quant-lab) 作为最新价数据源
+
+# 最新价数据源：所有 exchange 都提供选择（参考 performance_nested_2bc 等）
+symbols_for_latest = None
+source_as = "spot_em"
+if exchange_option == EXCHANGE_AS:
     price_sources = [
-        ("akshare (东方财富)", "spot_em", None),
-        ("Flight (quant-lab)", "flight", "symbols"),
+        ("akshare (东方财富)", "spot_em"),
+        ("Flight (quant-lab)", "flight"),
     ]
-    source_labels = [p[0] for p in price_sources]
-    default_idx = 0
-    price_source_label = st.selectbox(
-        "最新价数据源",
-        options=source_labels,
-        index=default_idx,
-        help="akshare 拉全市场；Flight 仅拉当前筛选出的标的（需 quant-lab 服务运行在 127.0.0.1:50001）",
-    )
-    source_param = price_sources[source_labels.index(price_source_label)][1]
-    needs_symbols = price_sources[source_labels.index(price_source_label)][2] == "symbols"
-    if st.button("Refresh latest prices"):
-        get_latest_market.clear()
-        st.rerun()
-    symbols_for_flight = df["symbol"].astype(str).str.strip().str.replace(r"\.[A-Za-z]+$", "", regex=True).str.zfill(6).unique().tolist()
-    if needs_symbols:
-        market_df = get_latest_market(source_param, symbols=tuple(symbols_for_flight))
-    else:
-        # 传 symbols 以便 akshare 失败时自动 fallback 到 Flight
-        market_df = get_latest_market(source_param, symbols=tuple(symbols_for_flight))
+    help_text = "akshare 拉全市场；Flight 仅拉当前筛选出的标的（需 quant-lab 服务运行在 127.0.0.1:50001）"
+elif exchange_option == EXCHANGE_EM:
+    price_sources = [
+        ("akshare (东方财富 概念/行业板块)", "spot_em"),
+        ("Flight (quant-lab)", "flight"),
+    ]
+    help_text = "akshare 失败时自动用 Flight 兜底；也可直接选 Flight（需 quant-lab 服务）"
+elif exchange_option == EXCHANGE_THS:
+    price_sources = [
+        ("akshare (同花顺板块)", "spot_em"),
+        ("Flight (quant-lab)", "flight"),
+    ]
+    help_text = "akshare 失败时自动用 Flight 兜底；也可直接选 Flight（需 quant-lab 服务）"
+else:
+    price_sources = [(f"当前 exchange={exchange_option}", "spot_em")]
+    help_text = ""
+
+source_labels = [p[0] for p in price_sources]
+price_source_label = st.selectbox(
+    "最新价数据源",
+    options=source_labels,
+    index=0,
+    help=help_text,
+)
+source_as = price_sources[source_labels.index(price_source_label)][1]
+# 所有 exchange 都传 symbols，供 Flight 兜底使用
+symbols_for_latest = df["symbol"].astype(str).str.strip().str.replace(r"\.[A-Za-z]+$", "", regex=True).str.zfill(6).unique().tolist()
+
+if st.button("Refresh latest prices"):
+    get_latest_market.clear()
+    _get_latest_market_em.clear()
+    _get_latest_market_ths.clear()
+    st.rerun()
+
+market_df = get_latest_market_for_exchange(exchange_option, symbols=symbols_for_latest, source_as=source_as)
 if market_df.empty:
     st.info("Failed to fetch latest market data. Try again later or check network/akshare")
     st.stop()

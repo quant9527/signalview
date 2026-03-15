@@ -1,5 +1,0 @@
-streamlit
-psycopg[binary]
-akshare
-rapidfuzz
-pypinyin

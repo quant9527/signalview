@@ -15,11 +15,13 @@ A lightweight Streamlit app for visualizing trading signals stored in a PostgreS
 ## Requirements
 
 - Python 3.10+
-- Install dependencies:
+- Install dependencies (from `pyproject.toml`):
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
+
+或使用 pip：`pip install -e .`
 
 ## Configuration
 

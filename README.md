@@ -1,4 +1,4 @@
-# 📈 Signal dataset
+# 📈 Signalview
 
 A lightweight Streamlit app for visualizing trading signals stored in a PostgreSQL database and comparing them to latest market prices.
 

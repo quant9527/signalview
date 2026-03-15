@@ -1,6 +1,6 @@
-# 构建并推送 signal-dashboard 镜像，对应 deploy/app/compose.yaml 中的 signal-dashboard 服务（8501）
-# 参考 infra 项目的 action 写法；镜像可用于 compose 的 IMAGE_TAG_FOR_signaldashboard
-name: build-signaldashboard
+# 构建并推送 signalview 镜像，对应 deploy/app/compose.yaml 中的 signalview 服务（8501）
+# 参考 infra 项目的 action 写法；镜像可用于 compose 的 IMAGE_TAG_FOR_signalview
+name: build-signalview
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
       - '*'
 
 env:
-  APP_NAME: signaldashboard
-  DOCKER_REPO: signaldashboard
+  APP_NAME: signalview
+  DOCKER_REPO: signalview
 
 permissions:
   packages: write

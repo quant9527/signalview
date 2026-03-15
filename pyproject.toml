@@ -1,5 +1,5 @@
 [project]
-name = "signal-dataset"
+name = "signalview"
 version = "0.1.0"
 description = "Streamlit app for trading signals and performance"
 readme = "README.md"

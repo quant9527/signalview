@@ -36,6 +36,8 @@ if df.empty:
 REBOUND_PIONEER_SIGNALS = [
     'cmp_rebound_pioneer_ma5ma10',  # 板块反弹急先锋信号
     'cmp_zs_macd',                   # MACD信号
+    'cmp_xsx_ma5ma10',
+    'cmp_xsx_macd'
 ]
 
 # 板块交易所配置

@@ -25,11 +25,7 @@ pages = {
         st.Page("views/review_key.py", title="Key Review", icon="⭐"),
     ],
     "Performance": [
-        st.Page("views/performance_nested_2bc.py", title="Nested 2bc", icon="🔍"),
-        st.Page("views/performance_nested_2bc_em.py", title="Nested 2bc EM", icon="🔍"),
-        st.Page("views/performance_pair_seg.py", title="Pair Seg", icon="📐"),
-        st.Page("views/performance_cl3b_macd.py", title="CL3B MACD", icon="📈"),
-        st.Page("views/performance_cmp_ths.py", title="CMP THS", icon="📊"),
+        st.Page("views/performance.py", title="Performance", icon="📊"),
     ],
     "Signals": [
         st.Page("views/all_signals_by_symbol.py", title="All Signals by Symbol", icon="📊"),
@@ -115,8 +111,8 @@ with st.sidebar:
         days = days_map.get(time_option, 45)
         df = load_data(time_window_days=days)
 
-# 确保 Performance 子页用到的信号在数据中（否则「Select signals」无对应选项）
-PERFORMANCE_SIGNAL_PREFIXES = ["nested_2bc", "pair_seg", "cl3b_macd", "cmp_em"]
+# 确保 Performance 页用到的信号在数据中（否则「Select signals」无对应选项）
+PERFORMANCE_SIGNAL_PREFIXES = ["nested_2bc", "pair_seg", "cl3b_macd", "cmp"]
 all_signal_names = set(df["signal_name"].dropna().unique())
 for prefix in PERFORMANCE_SIGNAL_PREFIXES:
     if not any(str(s).startswith(prefix) for s in all_signal_names):

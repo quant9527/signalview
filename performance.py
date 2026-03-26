@@ -8,48 +8,65 @@ from data import (
     _get_latest_market_em,
     _get_latest_market_ths,
 )
-from constants import EXCHANGE_AS, EXCHANGE_EM, EXCHANGE_THS, EXCHANGE_BINANCE, EXCHANGE_OPTIONS
-
-
-st.header("Signal Performance vs Current Prices — Ranking")
+from constants import EXCHANGE_AS, EXCHANGE_EM, EXCHANGE_THS, EXCHANGE_BINANCE
 
 df_full = st.session_state.df.copy()
 
 # Get main signal from session state (set by parent page)
 main_signal = st.session_state.get("main_signal", "")
 
-# Get all available signals
-all_signals = df_full['signal_name'].dropna().unique()
+# Get all available signals（排序保证序号稳定，便于 checkbox key）
+all_signals_list = sorted(df_full["signal_name"].dropna().unique().tolist())
 
-# Default signals based on main_signal prefix
+# Default signals：main_signal 可为 str 或 str 元组（多前缀并集）
 if main_signal:
-    default_signals = [s for s in all_signals if s.startswith(main_signal)]
+    if isinstance(main_signal, (tuple, list)):
+        prefixes = tuple(main_signal)
+        default_set = {
+            s for s in all_signals_list
+            if any(str(s).startswith(p) for p in prefixes)
+        }
+    else:
+        default_set = {s for s in all_signals_list if str(s).startswith(main_signal)}
 else:
-    default_signals = []
+    default_set = set()
 
-# Multi-select for all signals
-selected_signals = st.multiselect(
-    "Select signals",
-    options=all_signals,
-    default=default_signals,
-)
+preset_key = (main_signal, tuple(all_signals_list))
+if st.session_state.get("_perf_signal_preset_key") != preset_key:
+    st.session_state["_perf_signal_preset_key"] = preset_key
+    for i, s in enumerate(all_signals_list):
+        st.session_state[f"_perf_sig_chk_{i}"] = s in default_set
 
-# Filter data based on selected signals from multiselect
+st.markdown("**Select signals**")
+_sel_a, _sel_b = st.columns(2)
+with _sel_a:
+    if st.button("全选", key="_perf_sig_btn_all"):
+        for i in range(len(all_signals_list)):
+            st.session_state[f"_perf_sig_chk_{i}"] = True
+        st.rerun()
+with _sel_b:
+    if st.button("清空", key="_perf_sig_btn_clear"):
+        for i in range(len(all_signals_list)):
+            st.session_state[f"_perf_sig_chk_{i}"] = False
+        st.rerun()
+
+n_cols = 3
+_chk_cols = st.columns(n_cols)
+selected_signals = []
+for i, s in enumerate(all_signals_list):
+    with _chk_cols[i % n_cols]:
+        if st.checkbox(s, key=f"_perf_sig_chk_{i}"):
+            selected_signals.append(s)
+
+# Filter data based on selected signals
 if selected_signals:
     df = df_full[df_full['signal_name'].isin(selected_signals)].copy()
 else:
     st.warning("Please select at least one signal")
     st.stop()
 
-default_exchange = st.session_state.get("exchange", EXCHANGE_AS)
-default_index = EXCHANGE_OPTIONS.index(default_exchange) if default_exchange in EXCHANGE_OPTIONS else 0
-
-exchange_option = st.selectbox(
-    "Exchange",
-    options=EXCHANGE_OPTIONS,
-    index=default_index,
-    help="Select exchange/market type",
-)
+# Exchange 由入口页「功能」写入 session_state，避免与功能选择重复
+exchange_option = st.session_state.get("exchange", EXCHANGE_AS)
 
 # Filter by exchange if the column exists
 if 'exchange' in df.columns:
@@ -65,7 +82,7 @@ if exchange_option == EXCHANGE_BINANCE:
     st.warning("Binance exchange not yet implemented")
     st.stop()
 
-# 最新价数据源：所有 exchange 都提供选择（参考 performance_nested_2bc 等）
+# 最新价数据源：所有 exchange 都提供选择
 symbols_for_latest = None
 source_as = "spot_em"
 if exchange_option == EXCHANGE_AS:

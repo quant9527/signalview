@@ -9,7 +9,7 @@ on:
 
 env:
   APP_NAME: signalview
-  DOCKER_REPO: jei888/quant
+  DOCKER_REPO: ${{ vars.DOCKERHUB_USERNAME }}/quant # jei888/quant
 
 permissions:
   packages: write

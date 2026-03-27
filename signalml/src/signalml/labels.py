@@ -58,7 +58,15 @@ def attach_forward_returns(
     rets = []
     for _, row in out.iterrows():
         sym = row.get(symbol_col)
-        bars = bars_by_symbol.get(str(sym).strip()) or bars_by_symbol.get(normalize_sym(sym))
+        # 不能用 `a or b`：左侧为 DataFrame 时会触发 pandas 真值判断报错
+        if sym is None or pd.isna(sym):
+            k1, k2 = "", ""
+        else:
+            k1 = str(sym).strip()
+            k2 = normalize_sym(sym)
+        bars = bars_by_symbol.get(k1) if k1 else None
+        if bars is None or (isinstance(bars, pd.DataFrame) and bars.empty):
+            bars = bars_by_symbol.get(k2) if k2 else None
         if bars is None or bars.empty:
             rets.append(np.nan)
             continue

@@ -32,6 +32,9 @@ pages = {
         st.Page("views/sector_signals.py", title="Sector Signals", icon="🏢"),
         st.Page("views/search_signals.py", title="Search Signals", icon="🔍"),
     ],
+    "ML": [
+        st.Page("views/ml_scores.py", title="ML Scores", icon="🤖"),
+    ],
 }
 
 # Run navigation with top position

@@ -12,5 +12,12 @@ dependencies = [
     "pypinyin",
 ]
 
+[project.optional-dependencies]
+ml = ["signalml"]
+
+[tool.uv.sources]
+signalml = { path = "signalml", editable = true }
+
 [tool.uv]
 dev-dependencies = []
+

@@ -1,0 +1,26 @@
+[project]
+name = "signalml"
+version = "0.1.0"
+description = "Offline ML pipeline for signal-based return prediction (separate from signalview UI)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "psycopg[binary]>=3.1",
+    "scikit-learn>=1.4",
+    "joblib>=1.3",
+    "pyyaml>=6.0",
+    "akshare>=1.14",
+    "pyarrow>=14.0",
+]
+
+[project.scripts]
+signalml-train = "signalml.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

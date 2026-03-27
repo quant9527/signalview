@@ -41,7 +41,7 @@ jobs:
         with:
           registry_username: ${{ vars.DOCKERHUB_USERNAME }}
           registry_password: ${{ secrets.DOCKERHUB_TOKEN }}
-          tag: ${{ env.DOCKER_REPO }}:${{ steps.image_tag.outputs.new_image_tag }},${{ vars.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:latest
+          tag: ${{ env.DOCKER_REPO }}:${{ steps.image_tag.outputs.new_image_tag }},${{ env.DOCKER_REPO }}:latest
           file: ./Dockerfile
           platforms: linux/amd64
 

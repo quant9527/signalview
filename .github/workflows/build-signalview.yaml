@@ -53,5 +53,5 @@ jobs:
         with:
           workflow: trigger-set-image.yml
           repo: quant9527/deploy
-          inputs: '{ "repo":"${{ env.APP_NAME }}" ,"chart": "${{ env.APP_NAME }}", "image": "${{ secrets.USERNAME }}/${{ github.event.repository.name }}", "sha-tag": "${{ steps.image_tag.outputs.new_image_tag }}","branch_sha": "${{ steps.image_tag.outputs.branch_sha }}" }'
+          inputs: '{ "chart": "${{ env.APP_NAME }}", "image": "${{ env.DOCKER_REPO }}/${{ steps.image_tag.outputs.new_image_tag }}","branch_sha": "${{ steps.image_tag.outputs.branch_sha }}" }'
           token: ${{ secrets.WORKFLOW_ACCESS_ALL_MY_REPO }}

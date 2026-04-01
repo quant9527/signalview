@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from data import get_sector_constituents_from_db, create_all_signals_columns
+from signal_constants import CMP_SIGNAL_NAMES
 from utils import display_signals_compact, display_signals_multiview
 
 # ============================================================================
@@ -10,7 +11,7 @@ from utils import display_signals_compact, display_signals_multiview
 # 识别板块中率先反弹的个股（急先锋），这些股票往往是板块轮动中的领涨龙头
 # ============================================================================
 
-st.header("🔥 Hotspot")
+st.header("🔥 板块热点")
 st.markdown("""
 **模式特征：板块轮动中的领涨先锋**
 
@@ -29,16 +30,11 @@ if df.empty:
     st.stop()
 
 # ============================================================================
-# 配置区域 - 可调整的信号名称
+# 配置区域
 # ============================================================================
 
-# 可配置的信号列表 - 用于识别"板块反弹急先锋"模式
-REBOUND_PIONEER_SIGNALS = [
-    'cmp_rebound_pioneer_ma5ma10',  # 板块反弹急先锋信号
-    'cmp_zs_macd',                   # MACD信号
-    'cmp_xsx_ma5ma10',
-    'cmp_xsx_macd'
-]
+# 热点页使用的 CMP 系列（定义见 signal_constants.CMP_SIGNAL_NAMES）
+REBOUND_PIONEER_SIGNALS = list(CMP_SIGNAL_NAMES)
 
 # 板块交易所配置
 SECTOR_EXCHANGES = ['ths']  # 板块类型的 exchange 值

@@ -5,6 +5,7 @@ description = "Offline ML pipeline for signal-based return prediction (separate 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "python-dotenv>=1.0",
     "pandas>=2.0",
     "numpy>=1.26",
     "psycopg[binary]>=3.1",

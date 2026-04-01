@@ -49,10 +49,10 @@ def get_db_url(
     *,
     secrets_path: str | Path | None = None,
 ) -> str | None:
-    """Resolve DB URL: explicit arg > env > optional Streamlit secrets.toml."""
+    """Resolve DB URL: explicit arg > DATABASE_URL > optional Streamlit secrets.toml."""
     if explicit:
         return explicit
-    url = os.environ.get("POSTGRESQL_URL") or os.environ.get("DATABASE_URL")
+    url = os.environ.get("DATABASE_URL")
     if url:
         return url
     if secrets_path:
@@ -75,7 +75,7 @@ def load_signals(
     columns = (
         "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, "
         "signal_date, signal_name, signal, reason, price, score, shares, version, "
-        "created_at, updated_at, reverse"
+        "created_at, updated_at, reverse, position"
     )
     signal_filter = " AND signal_name LIKE %s" if signal_name_prefix else ""
     params: list = []
@@ -123,3 +123,37 @@ def load_signals(
         axis=1,
     )
     return df
+
+
+def load_ths_stock_sector_pairs(conn_url: str) -> pd.DataFrame:
+    """最新快照下：A 股 stock_symbol -> THS 板块/指数 sector_symbol（多对多）。"""
+    sql = """
+        WITH latest AS (
+            SELECT MAX(snapshot_date) AS d
+            FROM sector_constituent
+            WHERE sector_exchange = 'ths' AND stock_exchange = 'as'
+        )
+        SELECT DISTINCT sc.stock_symbol, sc.sector_symbol
+        FROM sector_constituent sc
+        CROSS JOIN latest l
+        WHERE sc.sector_exchange = 'ths'
+          AND sc.stock_exchange = 'as'
+          AND sc.snapshot_date = l.d
+    """
+    with psycopg.connect(conn_url, connect_timeout=120) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+            cols = [d[0] for d in cur.description]
+    if not rows:
+        return pd.DataFrame(columns=["stock_symbol", "sector_symbol"])
+    return pd.DataFrame(rows, columns=cols)
+
+
+def pairs_to_stock_sectors(df_pairs: pd.DataFrame) -> dict[str, list[str]]:
+    if df_pairs.empty:
+        return {}
+    g = df_pairs.groupby("stock_symbol")["sector_symbol"].apply(
+        lambda s: sorted(s.astype(str).unique().tolist())
+    )
+    return {str(k): v for k, v in g.to_dict().items()}

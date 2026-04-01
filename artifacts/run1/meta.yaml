@@ -1,0 +1,7 @@
+exchange_filter: as
+horizon_days: 5
+metrics:
+  mae_test: 0.06914590768957685
+  n_test: 502366
+  n_train: 2009464
+  r2_test: -0.5331122246498738

@@ -12,9 +12,13 @@ import yaml
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 
+from signalml.db import load_ths_stock_sector_pairs, pairs_to_stock_sectors
 from signalml.features import FeaturePipeline
+from signalml.features_kline import attach_market_kline_features
+from signalml.features_resonance import attach_resonance_features
 from signalml.labels import attach_forward_returns
-from signalml.prices import fetch_daily_bars, normalize_symbol_6
+from signalml.flight_kline import SYMBOL_CSI300, normalize_asindex_symbol
+from signalml.prices import fetch_bars_map, normalize_symbol_6
 
 
 def time_based_split(df: pd.DataFrame, test_ratio: float = 0.2, date_col: str = "signal_date"):
@@ -30,32 +34,63 @@ def time_based_split(df: pd.DataFrame, test_ratio: float = 0.2, date_col: str = 
     return train.drop(columns=["_d"]), test.drop(columns=["_d"])
 
 
-def build_bars_map(symbols: list[str], cache_dir: Path | None) -> dict[str, pd.DataFrame]:
-    out: dict[str, pd.DataFrame] = {}
-    for sym in symbols:
-        code = normalize_symbol_6(sym)
-        bars = fetch_daily_bars(sym, cache_dir=cache_dir)
-        if not bars.empty:
-            out[code] = bars
-    return out
+def build_bars_map(
+    symbols: list[str],
+    cache_dir: Path | None,
+    exchange: str = "as",
+) -> dict[str, pd.DataFrame]:
+    return fetch_bars_map(symbols, cache_dir=cache_dir, exchange=exchange)
 
 
 def train_pipeline(
-    df: pd.DataFrame,
+    df_all: pd.DataFrame,
     horizon_days: int,
     cache_dir: Path | None,
     test_ratio: float = 0.2,
     exchange_filter: str | None = "as",
+    *,
+    conn_url: str | None = None,
+    use_resonance: bool = True,
+    resonance_lookback_days: int = 5,
+    use_ths_resonance: bool = True,
+    ths_signal_name_substr: str | None = None,
+    ths_position_filter: str | None = None,
+    use_kline_market: bool = True,
 ) -> dict[str, Any]:
-    d = df.copy()
+    d = df_all.copy()
     if exchange_filter and "exchange" in d.columns:
         d = d[d["exchange"].astype(str) == exchange_filter].copy()
     if d.empty:
         raise ValueError("No rows after exchange filter")
     syms = d["symbol"].astype(str).unique().tolist()
-    bars = build_bars_map(syms, cache_dir)
+    ex = (exchange_filter or "as").strip() or "as"
+    bars = build_bars_map(syms, cache_dir, exchange=ex)
     labeled = attach_forward_returns(d, bars, horizon_days=horizon_days)
     labeled = labeled.dropna(subset=["label_fwd_ret"])
+
+    if use_kline_market:
+        hs300_key = normalize_asindex_symbol(SYMBOL_CSI300)
+        idx_map = fetch_bars_map(
+            [SYMBOL_CSI300],
+            cache_dir=cache_dir,
+            exchange="asindex",
+        )
+        hs300_bars = idx_map.get(hs300_key) if hs300_key else None
+        labeled = attach_market_kline_features(labeled, bars, hs300_bars)
+
+    stock_to_sectors: dict[str, list[str]] = {}
+    if use_resonance and use_ths_resonance and conn_url:
+        pairs = load_ths_stock_sector_pairs(conn_url)
+        stock_to_sectors = pairs_to_stock_sectors(pairs)
+    if use_resonance:
+        labeled = attach_resonance_features(
+            labeled,
+            df_all,
+            lookback_days=resonance_lookback_days,
+            stock_to_sectors=stock_to_sectors if use_ths_resonance else {},
+            ths_signal_name_substr=ths_signal_name_substr if use_ths_resonance else None,
+            ths_position_filter=ths_position_filter if use_ths_resonance else None,
+        )
     if len(labeled) < 50:
         raise ValueError(f"Too few labeled rows: {len(labeled)}")
     train_df, test_df = time_based_split(labeled, test_ratio=test_ratio)
@@ -86,6 +121,20 @@ def train_pipeline(
         "metrics": metrics,
         "horizon_days": horizon_days,
         "exchange_filter": exchange_filter,
+        "stock_to_sectors": stock_to_sectors,
+        "resonance_config": {
+            "enabled": use_resonance,
+            "lookback_days": resonance_lookback_days,
+            "use_ths": use_ths_resonance,
+            "ths_signal_name_substr": ths_signal_name_substr,
+            "ths_position_filter": ths_position_filter,
+        },
+        "kline_market_config": {
+            "enabled": use_kline_market,
+            "hs300_symbol": SYMBOL_CSI300,
+            "stock_exchange": ex,
+        },
+        "cache_dir": str(cache_dir) if cache_dir is not None else None,
     }
 
 
@@ -97,6 +146,9 @@ def save_artifact(bundle: dict[str, Any], out_dir: str | Path) -> Path:
         "horizon_days": bundle["horizon_days"],
         "exchange_filter": bundle["exchange_filter"],
         "metrics": bundle["metrics"],
+        "resonance_config": bundle.get("resonance_config"),
+        "kline_market_config": bundle.get("kline_market_config"),
+        "cache_dir": bundle.get("cache_dir"),
     }
     (out_dir / "meta.yaml").write_text(yaml.safe_dump(meta, allow_unicode=True), encoding="utf-8")
     return out_dir

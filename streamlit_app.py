@@ -14,8 +14,8 @@ pages = {
     ],
     "AS": [
         st.Page("views/review_index.py", title="大盘", icon="📈"),
-        st.Page("views/review_hotspot.py", title="Hotspot", icon="🔥", default=True),
-        st.Page("views/active_vol_then_nested_bc.py", title="active_vol_then_nested_bc", icon="📉"),
+        st.Page("views/review_hotspot.py", title="板块热点", icon="🔥", default=True),
+        st.Page("views/active_vol_then_nestedbc.py", title="active_vol_then_nestedbc", icon="📉"),
         st.Page("views/profit_pattern_cl3b_zsx.py", title="CL3B ZSX", icon="📈"),
     ],
     "Review": [
@@ -49,7 +49,7 @@ def _get_conn_str():
         return st.secrets["connections"]["quantdb"]["url"]
     except (KeyError, FileNotFoundError, Exception):
         pass
-    return os.environ.get("POSTGRESQL_URL") or os.environ.get("DATABASE_URL")
+    return os.environ.get("DATABASE_URL")
 
 
 @st.cache_resource
@@ -64,7 +64,7 @@ def get_connection():
         st.error(
             "未配置数据库连接。请任选其一：\n"
             "1. 复制 `.streamlit/secrets.toml.example` 为 `.streamlit/secrets.toml` 并填入 `[connections.quantdb] url`\n"
-            "2. 或设置环境变量 `POSTGRESQL_URL` 或 `DATABASE_URL`"
+            "2. 或设置环境变量 `DATABASE_URL`"
         )
         st.stop()
 
@@ -76,6 +76,7 @@ def get_connection():
 
 # Import the centralized load_data function
 from data import load_data
+from signal_constants import SIGNAL_NAME_PREFIXES_PRELOAD
 
 
 # --- Settings: parameterize time window in sidebar ---
@@ -114,10 +115,9 @@ with st.sidebar:
         days = days_map.get(time_option, 45)
         df = load_data(time_window_days=days)
 
-# 确保 Performance 页用到的信号在数据中（否则「Select signals」无对应选项）
-PERFORMANCE_SIGNAL_PREFIXES = ["nested_2bc", "pair_seg", "cl3b_macd", "cmp"]
+# 确保各页常用系列在 df 中（缺则按前缀补拉，见 signal_constants.SIGNAL_NAME_PREFIXES_PRELOAD）
 all_signal_names = set(df["signal_name"].dropna().unique())
-for prefix in PERFORMANCE_SIGNAL_PREFIXES:
+for prefix in SIGNAL_NAME_PREFIXES_PRELOAD:
     if not any(str(s).startswith(prefix) for s in all_signal_names):
         if time_option == "Custom range":
             df_extra = load_data(time_window_days=None, start_date=start_str, end_date=end_str, signal_name_prefix=prefix)

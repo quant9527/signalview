@@ -6,6 +6,18 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+# 仓库根目录下的默认训练产物（与 `signalml-train ... --out ./artifacts/run1` 一致）
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DEFAULT_ARTIFACT_DIR = _REPO_ROOT / "artifacts" / "run1"
+
+
+def _default_artifact_dir_str() -> str:
+    env = os.environ.get("SIGNALML_ARTIFACT_DIR", "").strip()
+    if env:
+        return env
+    return str(_DEFAULT_ARTIFACT_DIR)
+
+
 st.header("ML Scores (signalml)")
 
 try:
@@ -19,11 +31,13 @@ except ImportError:
     )
     st.stop()
 
-default_dir = os.environ.get("SIGNALML_ARTIFACT_DIR", "").strip()
 artifact_dir = st.sidebar.text_input(
     "signalml 产物目录（含 model.joblib）",
-    value=default_dir,
-    help="训练时 --out 指向的目录；也可设置环境变量 SIGNALML_ARTIFACT_DIR",
+    value=_default_artifact_dir_str(),
+    help=(
+        "默认：仓库内 artifacts/run1（未设置 SIGNALML_ARTIFACT_DIR 时）。"
+        "训练示例：signalml-train train ... --out ./artifacts/run1"
+    ),
 )
 if not artifact_dir or not Path(artifact_dir).is_dir():
     st.info("请填写有效的产物目录，或先运行 `signalml-train train ... --out <dir>`。")
@@ -60,7 +74,7 @@ else:
     df_show = df.copy()
 
 try:
-    scores = predict_scores(df_show, artifact_dir)
+    scores = predict_scores(df_show, artifact_dir, context_df=st.session_state.df)
 except Exception as e:
     st.error(f"预测失败: {e}")
     st.stop()

@@ -4,18 +4,11 @@ from pathlib import Path
 import streamlit as st
 
 from constants import EXCHANGE_AS, EXCHANGE_THS
+from signal_constants import PERFORMANCE_PRESET_AS_PREFIXES, PERFORMANCE_PRESET_THS_PREFIXES
 
 _PRESETS = [
-    (
-        EXCHANGE_AS,
-        ("nested_2bc", "pair_seg", "cl3b_macd", "cmp"),
-        EXCHANGE_AS,
-    ),
-    (
-        EXCHANGE_THS,
-        ("cmp","cl3b_macd",),
-        EXCHANGE_THS,
-    ),
+    (EXCHANGE_AS, PERFORMANCE_PRESET_AS_PREFIXES, EXCHANGE_AS),
+    (EXCHANGE_THS, PERFORMANCE_PRESET_THS_PREFIXES, EXCHANGE_THS),
 ]
 _LABELS = [p[0] for p in _PRESETS]
 

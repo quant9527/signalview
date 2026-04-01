@@ -114,46 +114,22 @@ def calculate_performance_metrics(merged_df):
 def _get_latest_market_flight(symbols: list, exchange: str = "as", flight_url: str = "grpc://127.0.0.1:50001") -> pd.DataFrame:
     """
     通过 quant-lab Flight 服务拉取 K 线，取每只标的最近一根的 close 作为最新价。
-    接口约定与 quant-lab/quant/data.py 的 get_flight(kline) 一致。
+    请求体与 flight_kline_client / quant-lab 一致。
     """
-    import json
-    import re
     from datetime import datetime, timedelta
+
+    import flight_kline_client as fkc
 
     if not symbols:
         return pd.DataFrame(columns=["code", "price", "change_percent"])
 
-    try:
-        from pyarrow import flight
-    except ImportError:
+    tags = fkc.build_kline_tags(list(symbols), exchange, "1d")
+    if not tags:
         return pd.DataFrame(columns=["code", "price", "change_percent"])
 
-    # 与 quant-lab 一致：tag = exchange_symbol_freq，如 as_600519_1d
-    def _norm(s):
-        s = str(s).strip()
-        s = re.sub(r"\.[A-Za-z]+$", "", s)
-        return s.zfill(6) if s else ""
-
-    symbols_6 = [_norm(s) for s in symbols if _norm(s)]
-    tags = [f"{exchange}_{s}_1d" for s in symbols_6]
     end_ts = int(datetime.now().timestamp() * 1000)
     start_ts = int((datetime.now() - timedelta(days=5)).timestamp() * 1000)
-    req = {
-        "name": "kline",
-        "start_time": start_ts,
-        "end_time": end_ts,
-        "tags": tags,
-        "kline_aggregate": "",
-        "kline_reverse": False,
-    }
-    try:
-        client = flight.FlightClient(flight_url)
-        ticket = flight.Ticket(json.dumps(req))
-        reader = client.do_get(ticket)
-        kline_df = reader.read_pandas()
-    except Exception as e:
-        print(f"[Flight] get_latest_market_flight failed: {e}")
-        return pd.DataFrame(columns=["code", "price", "change_percent"])
+    kline_df = fkc.fetch_kline_dataframe(tags, start_ts, end_ts, flight_url=flight_url)
 
     if kline_df is None or kline_df.empty:
         return pd.DataFrame(columns=["code", "price", "change_percent"])
@@ -349,7 +325,7 @@ def load_data(time_window_days: int = 30, start_date: str | None = None, end_dat
         with psycopg.connect(conn_str, connect_timeout=120) as conn:
             with conn.cursor() as cur:
                 # 不查询 debug_info 字段，该字段数据量太大会导致传输极慢
-                columns = "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, signal_date, signal_name, signal, reason, price, score, shares, version, created_at, updated_at, reverse"
+                columns = "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, signal_date, signal_name, signal, reason, price, score, shares, version, created_at, updated_at, reverse, position"
                 signal_filter = " AND signal_name LIKE %s" if signal_name_prefix else ""
                 params: list = []
                 if start_date and end_date:

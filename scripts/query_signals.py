@@ -3,6 +3,11 @@
 import os
 import sys
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from signal_constants import ACTIVE_VOL_NESTED_SHORT_FREQS, NESTED_2BC_PREFIX
+
 def get_conn_str():
     try:
         import tomllib
@@ -13,12 +18,12 @@ def get_conn_str():
         with open(path, "rb") as f:
             s = tomllib.load(f)
         return s.get("connections", {}).get("quantdb", {}).get("url")
-    return os.environ.get("POSTGRESQL_URL") or os.environ.get("DATABASE_URL")
+    return os.environ.get("DATABASE_URL")
 
 def main():
     conn_str = get_conn_str()
     if not conn_str:
-        print("未找到连接配置：.streamlit/secrets.toml 或环境变量 POSTGRESQL_URL/DATABASE_URL", file=sys.stderr)
+        print("未找到连接配置：.streamlit/secrets.toml 或环境变量 DATABASE_URL", file=sys.stderr)
         sys.exit(1)
     import psycopg
     with psycopg.connect(conn_str) as conn:
@@ -45,14 +50,18 @@ def main():
                 print(f"  {row[0]}: {row[1]}")
 
             # nested_2bc 的 freq 分布
-            cur.execute("""
+            like_pat = NESTED_2BC_PREFIX + "%"
+            cur.execute(
+                """
                 SELECT freq, COUNT(*) AS cnt
                 FROM signal
                 WHERE signal_date >= now() - interval '45 days'
-                  AND signal_name LIKE 'nested_2bc%'
+                  AND signal_name LIKE %s
                 GROUP BY freq
                 ORDER BY cnt DESC
-            """)
+                """,
+                (like_pat,),
+            )
             rows = cur.fetchall()
             print("\nnested_2bc* 的 freq 分布:")
             if not rows:
@@ -61,13 +70,17 @@ def main():
                 for row in rows:
                     print(f"  {row[0]}: {row[1]}")
 
-            # 5m/15m 的 nested_2bc 条数（不区分大小写）
-            cur.execute("""
+            # 小周期 nested_2bc 条数（不区分大小写，周期见 signal_constants.ACTIVE_VOL_NESTED_SHORT_FREQS）
+            freqs_sql = ", ".join("%s" for _ in ACTIVE_VOL_NESTED_SHORT_FREQS)
+            cur.execute(
+                f"""
                 SELECT COUNT(*) FROM signal
                 WHERE signal_date >= now() - interval '45 days'
-                  AND signal_name LIKE 'nested_2bc%'
-                  AND LOWER(TRIM(freq::text)) IN ('5m', '15m')
-            """)
+                  AND signal_name LIKE %s
+                  AND LOWER(TRIM(freq::text)) IN ({freqs_sql})
+                """,
+                (like_pat, *[f.lower() for f in ACTIVE_VOL_NESTED_SHORT_FREQS]),
+            )
             n_5m15m = cur.fetchone()[0]
             print(f"\nnested_2bc* 且 freq 为 5m/15m 的条数: {n_5m15m}")
 

@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from signal_constants import CL3B_ZSX_PREFIX
 from utils import display_signals_multiview
 
 # ============================================================================
@@ -30,7 +31,7 @@ if df.empty:
 # ============================================================================
 # 配置区域（紧凑显示）
 # ============================================================================
-TARGET_SIGNAL_PREFIX = 'cl3b_zsx'
+TARGET_SIGNAL_PREFIX = CL3B_ZSX_PREFIX
 
 # 获取所有匹配的信号类型和可用周期
 all_matching_signals = df[df['signal_name'].str.startswith(TARGET_SIGNAL_PREFIX, na=False)]['signal_name'].unique().tolist()

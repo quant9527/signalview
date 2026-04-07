@@ -171,15 +171,8 @@ def _get_latest_market_flight(symbols: list, exchange: str = "as", flight_url: s
     return latest[["code", "price", "change_percent"]].copy()
 
 
-@st.cache_data(ttl=600, show_spinner=False)
-def get_latest_market(source: str = "spot_em", symbols: list | None = None):
-    """
-    获取最新行情。source: "spot_em" | "spot" | "flight"。
-    当 source=="flight" 时，symbols 必填，从 quant-lab Flight 服务拉取 A 股最新价。
-    """
-    import akshare as ak
-    import pandas as pd
-    import os
+def _normalize_market_df_columns(market_df):
+    """东财/新浪等行情表 → 统一 code, price, change_percent。"""
 
     def _find_column(df, candidates):
         for c in candidates:
@@ -187,62 +180,101 @@ def get_latest_market(source: str = "spot_em", symbols: list | None = None):
                 return c
         return None
 
-    if source == "flight":
-        with st.spinner("Fetching latest prices from Flight (quant-lab)..."):
-            flight_url = os.environ.get("FLIGHT_URL", "grpc://127.0.0.1:50001")
-            return _get_latest_market_flight(symbols or [], exchange="as", flight_url=flight_url)
+    code_col = _find_column(market_df, ["代码", "symbol", "code"])
+    price_col = _find_column(market_df, ["最新价", "现价", "price", "trade", "now"])
+    change_col = _find_column(
+        market_df,
+        ["涨跌幅", "涨跌额", "涨跌%", "pct_chg", "change_percent", "changepercent", "change"],
+    )
+    rename_map = {}
+    if code_col:
+        rename_map[code_col] = "code"
+    if price_col:
+        rename_map[price_col] = "price"
+    if change_col:
+        rename_map[change_col] = "change_percent"
+    if rename_map:
+        market_df = market_df.rename(columns=rename_map)
+    return market_df
 
-    # 多数据源依次尝试：东方财富(重试) -> 新浪 -> Flight(若传入 symbols)
-    def _normalize_market_df(market_df):
-        code_col = _find_column(market_df, ["代码", "symbol", "code"])
-        price_col = _find_column(market_df, ["最新价", "现价", "price", "trade", "now"])
-        change_col = _find_column(market_df, ["涨跌幅", "涨跌额", "涨跌%", "pct_chg", "change_percent", "changepercent", "change"])
-        rename_map = {}
-        if code_col:
-            rename_map[code_col] = "code"
-        if price_col:
-            rename_map[price_col] = "price"
-        if change_col:
-            rename_map[change_col] = "change_percent"
-        if rename_map:
-            market_df = market_df.rename(columns=rename_map)
-        return market_df
 
-    with st.spinner("Fetching latest market prices..."):
-        import time
-        last_err = None
-        # 1) 东方财富
-        for attempt in range(3):
-            try:
-                if attempt > 0:
-                    time.sleep(2)
-                market_df = ak.stock_zh_a_spot_em()
-                if market_df is not None and not market_df.empty:
-                    return _normalize_market_df(market_df)
-            except Exception as e:
-                last_err = e
-                if attempt < 2:
-                    continue
-        # 2) 新浪 A 股实时行情（常返回 HTML 导致 JSONDecodeError，仅作 fallback）
+@st.cache_data(ttl=600, show_spinner=False)
+def _get_latest_market_as_spot_full() -> pd.DataFrame:
+    """
+    A 股全市场现货（东财重试 → 新浪）。结果与请求方传入的 symbols 无关，
+    便于 nested_bc / Performance 等页共用同一条缓存，避免重复打 akshare。
+    """
+    import time
+
+    import akshare as ak
+
+    last_err = None
+    for attempt in range(3):
         try:
-            time.sleep(1)
-            market_df = ak.stock_zh_a_spot()
+            if attempt > 0:
+                time.sleep(2)
+            market_df = ak.stock_zh_a_spot_em()
             if market_df is not None and not market_df.empty:
-                st.info("东方财富不可用，已改用新浪数据源。")
-                return _normalize_market_df(market_df)
+                return _normalize_market_df_columns(market_df)
         except Exception as e:
             last_err = e
-        # 3) Flight
-        if symbols and len(symbols) > 0:
-            flight_url = os.environ.get("FLIGHT_URL", "grpc://127.0.0.1:50001")
-            fallback_df = _get_latest_market_flight(list(symbols), exchange="as", flight_url=flight_url)
-            if not fallback_df.empty:
-                st.info("东方财富/新浪均不可用，已自动改用 Flight 数据源。")
-                return fallback_df
-        st.error("获取 A 股行情失败，请稍后重试或切换为「最新价数据源 → Flight (quant-lab)」。")
-        if last_err:
-            st.exception(last_err)
+            if attempt < 2:
+                continue
+    try:
+        time.sleep(1)
+        market_df = ak.stock_zh_a_spot()
+        if market_df is not None and not market_df.empty:
+            st.info("东方财富不可用，已改用新浪数据源。")
+            return _normalize_market_df_columns(market_df)
+    except Exception:
+        pass
     return pd.DataFrame()
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _get_latest_market_as_flight_cached(symbols: tuple[str, ...]) -> pd.DataFrame:
+    """A 股 Flight 按标的列表缓存（元组已排序，键稳定）。"""
+    import os
+
+    flight_url = os.environ.get("FLIGHT_URL", "grpc://127.0.0.1:50001")
+    return _get_latest_market_flight(list(symbols), exchange="as", flight_url=flight_url)
+
+
+def get_latest_market(source: str = "spot_em", symbols: list | None = None):
+    """
+    获取最新行情。source: "spot_em" | "spot" | "flight"。
+    当 source=="flight" 时，从 quant-lab Flight 按 symbols 拉取 A 股最新价。
+
+    缓存说明：东财/新浪全市场拉取与 symbols 无关，多页共享一条 TTL=600s 缓存；
+    Flight 按排序后的 symbols 元组单独缓存。
+    """
+    sym_list = list(symbols) if symbols else []
+    sym_t = tuple(sorted(sym_list))
+
+    if source == "flight":
+        with st.spinner("Fetching latest prices from Flight (quant-lab)..."):
+            return _get_latest_market_as_flight_cached(sym_t)
+
+    with st.spinner("Fetching latest market prices..."):
+        df = _get_latest_market_as_spot_full()
+    if df is not None and not df.empty:
+        return df
+
+    if sym_t:
+        with st.spinner("Fetching latest prices from Flight (quant-lab)..."):
+            fallback_df = _get_latest_market_as_flight_cached(sym_t)
+        if not fallback_df.empty:
+            st.info("东方财富/新浪均不可用，已自动改用 Flight 数据源。")
+            return fallback_df
+
+    st.error("获取 A 股行情失败，请稍后重试或切换为「最新价数据源 → Flight (quant-lab)」。")
+    return pd.DataFrame()
+
+
+def clear_a_share_latest_market_cache() -> None:
+    """清空 A 股最新价缓存（东财/新浪全表 + Flight 按标的缓存）。供各页「刷新行情」调用。"""
+    _get_latest_market_as_spot_full.clear()
+    _get_latest_market_as_flight_cached.clear()
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -325,7 +357,7 @@ def load_data(time_window_days: int = 30, start_date: str | None = None, end_dat
         with psycopg.connect(conn_str, connect_timeout=120) as conn:
             with conn.cursor() as cur:
                 # 不查询 debug_info 字段，该字段数据量太大会导致传输极慢
-                columns = "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, signal_date, signal_name, signal, reason, price, score, shares, version, created_at, updated_at, reverse, position"
+                columns = "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, signal_date, signal_name, signal, reason, price, score, shares, version, created_at, updated_at, reverse, side"
                 signal_filter = " AND signal_name LIKE %s" if signal_name_prefix else ""
                 params: list = []
                 if start_date and end_date:

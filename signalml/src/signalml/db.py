@@ -75,7 +75,7 @@ def load_signals(
     columns = (
         "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, "
         "signal_date, signal_name, signal, reason, price, score, shares, version, "
-        "created_at, updated_at, reverse, position"
+        "created_at, updated_at, reverse, side"
     )
     signal_filter = " AND signal_name LIKE %s" if signal_name_prefix else ""
     params: list = []

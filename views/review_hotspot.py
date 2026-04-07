@@ -74,20 +74,20 @@ st.divider()
 # ============================================================================
 st.subheader("1️⃣ 板块反弹急先锋")
 
+st.caption(f"本段仅统计 **exchange ∈ {SECTOR_EXCHANGES}**（同花顺板块）的上述信号。")
 st.markdown("**追踪信号：**")
 for sig in REBOUND_PIONEER_SIGNALS:
     st.text(f"• {sig}")
 
-# 使用反弹急先锋相关信号
+# 使用反弹急先锋相关信号（仅限 ths）
 all_pattern_signals = REBOUND_PIONEER_SIGNALS
-available_signals = df['signal_name'].unique().tolist()
+ths_df = df[df["exchange"].isin(SECTOR_EXCHANGES)].copy()
+available_signals = ths_df["signal_name"].unique().tolist()
 
-# 检查哪些配置的信号在数据中存在
 found_signals = [sig for sig in all_pattern_signals if sig in available_signals]
 missing_signals = [sig for sig in all_pattern_signals if sig not in available_signals]
 
-# 筛选符合模式的信号
-pattern_df = df[df['signal_name'].isin(found_signals)].copy()
+pattern_df = ths_df[ths_df["signal_name"].isin(found_signals)].copy()
 
 if pattern_df.empty:
     st.warning("未找到符合当前模式的信号数据")

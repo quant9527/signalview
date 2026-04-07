@@ -71,10 +71,13 @@ def fetch_kline_dataframe(
     start_time_ms: int,
     end_time_ms: int,
     flight_url: str | None = None,
+    *,
+    kline_reverse: bool = False,
 ) -> pd.DataFrame | None:
     """
     单次 do_get，返回 Flight 完整 K 线表（多标的混表）。
     请求体与 quant-lab / signalview data._get_latest_market_flight 一致。
+    kline_reverse：与 quant-lab 一致，控制服务端是否倒序返回 K 线。
     """
     if not tags:
         return None
@@ -89,7 +92,7 @@ def fetch_kline_dataframe(
         "end_time": int(end_time_ms),
         "tags": tags,
         "kline_aggregate": "",
-        "kline_reverse": False,
+        "kline_reverse": bool(kline_reverse),
     }
     try:
         client = flight.FlightClient(url)
@@ -188,13 +191,16 @@ def fetch_klines_by_symbols_flight(
     kline_freq: str = "1d",
     lookback_years: int = 15,
     flight_url: str | None = None,
+    kline_reverse: bool = False,
 ) -> dict[str, pd.DataFrame] | None:
     tags = build_kline_tags(symbols, exchange, kline_freq)
     if not tags:
         return None
     end_ms = int(datetime.now().timestamp() * 1000)
     start_ms = int((datetime.now() - timedelta(days=365 * lookback_years)).timestamp() * 1000)
-    raw = fetch_kline_dataframe(tags, start_ms, end_ms, flight_url=flight_url)
+    raw = fetch_kline_dataframe(
+        tags, start_ms, end_ms, flight_url=flight_url, kline_reverse=kline_reverse
+    )
     if raw is None or raw.empty:
         return None
     return split_kline_by_symbol(raw)

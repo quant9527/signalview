@@ -42,9 +42,11 @@ def _build_ths_sector_dates(
     if th.empty:
         return {}
     want_pos = (ths_position_filter or "").strip().lower()
-    if want_pos and "position" in th.columns:
-        pv = th["position"].astype(str).str.strip().str.lower()
-        th = th[pv == want_pos]
+    if want_pos:
+        pos_col = "side" if "side" in th.columns else ("position" if "position" in th.columns else None)
+        if pos_col:
+            pv = th[pos_col].astype(str).str.strip().str.lower()
+            th = th[pv == want_pos]
     if ths_signal_name_substr:
         sub = ths_signal_name_substr.strip()
         if sub:

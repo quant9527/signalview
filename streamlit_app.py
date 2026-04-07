@@ -14,9 +14,12 @@ pages = {
     ],
     "AS": [
         st.Page("views/review_index.py", title="大盘", icon="📈"),
+        st.Page("views/kline.py", title="K线", icon="🕯️"),
         st.Page("views/review_hotspot.py", title="板块热点", icon="🔥", default=True),
         st.Page("views/active_vol_then_nestedbc.py", title="active_vol_then_nestedbc", icon="📉"),
+        st.Page("views/nested_bc.py", title="nested_bc", icon="📊"),
         st.Page("views/profit_pattern_cl3b_zsx.py", title="CL3B ZSX", icon="📈"),
+        st.Page("views/main_then_yd.py", title="主→yd", icon="🔗"),
     ],
     "Review": [
         st.Page("views/overview.py", title="Overview", icon="🏠"),

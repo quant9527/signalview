@@ -151,7 +151,7 @@ def main() -> None:
         type=str,
         default=_env_str("SIGNALML_THS_POSITION"),
         metavar="long|short",
-        help="THS 共振时仅统计 signal.position 等于该值（与库中存储比大小写不敏感，如 long / short）；默认不过滤（.env: SIGNALML_THS_POSITION）",
+        help="THS 共振时仅统计 signal.side 等于该值（与库中存储比大小写不敏感，如 long / short）；默认不过滤（.env: SIGNALML_THS_POSITION）",
     )
 
     args = p.parse_args()

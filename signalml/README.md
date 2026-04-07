@@ -87,8 +87,8 @@ signalml-train train --days 180 --horizon 5 --out ./artifacts/run1
 可选参数：
 
 - `--resonance-days 5`、`--no-resonance`、`--no-ths-resonance`
-- **`--ths-position long`**（或 `short`）：只统计 `signal` 表里 **`position` 列**与该值匹配的 THS 信号（大小写不敏感，需与库中实际取值一致，如 `long`/`short`）
-- `--ths-signal-filter 子串`：在 `position` 筛选之后，再要求 `signal_name` 包含该子串（可选叠加）
+- **`--ths-position long`**（或 `short`）：只统计 `signal` 表里 **`side` 列**与该值匹配的 THS 信号（大小写不敏感，需与库中实际取值一致，如 `long`/`short`）
+- `--ths-signal-filter 子串`：在 `side` 筛选之后，再要求 `signal_name` 包含该子串（可选叠加）
 
 说明：若要在标签上对齐「板块信号略晚于个股」这类关系，需要单独定义决策时点或标签，当前实现刻意不在个股信号日之后读取板块信号，以防标签泄漏。
 

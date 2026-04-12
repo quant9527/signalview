@@ -50,6 +50,7 @@ def build_kline_tags(symbols: list[str], exchange: str, kline_freq: str = "1d") 
     """
     生成 Flight tags：{exchange}_{symbol}_{freq}。
     - exchange=as：个股 6 位代码，如 as_600519_1d
+    - exchange=ths：同个股 6 位规范，如 ths_600519_1d
     - exchange=asindex：指数带 sh/sz，如 asindex_sh000300_1d（沪深300）
     """
     ex = str(exchange).strip() or "as"

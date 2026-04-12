@@ -19,10 +19,20 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import flight_kline_client as fkc
+from constants import (
+    EXCHANGE_AS,
+    KLINE_DEFAULT_FREQ,
+    KLINE_EXCHANGE_OPTIONS,
+    KLINE_FREQ_OPTIONS,
+    KLINE_FREQ_SET,
+)
 
 TZ_SHANGHAI = ZoneInfo("Asia/Shanghai")
 
-_EXCH_OPTIONS = ("as", "asindex")
+
+def _coerce_kline_freq(raw: str | None) -> str:
+    s = (raw or "").strip() or KLINE_DEFAULT_FREQ
+    return s if s in KLINE_FREQ_SET else KLINE_DEFAULT_FREQ
 
 
 def _qp_get(qp, key: str) -> str | None:
@@ -64,10 +74,10 @@ def _truthy_param(s: str | None) -> bool:
 def _sync_session_from_query_params(qp, *, full: bool, default_start: date, default_end: date) -> None:
     """full=True 时每轮用 URL 覆盖控件状态；full=False 时只覆盖 URL 里出现的键。"""
     if full:
-        ex = _qp_get(qp, "exchange") or "as"
-        st.session_state["kline_exchange"] = ex if ex in _EXCH_OPTIONS else "as"
+        ex = _qp_get(qp, "exchange") or EXCHANGE_AS
+        st.session_state["kline_exchange"] = ex if ex in KLINE_EXCHANGE_OPTIONS else EXCHANGE_AS
         st.session_state["kline_symbol"] = _qp_get(qp, "symbol") or ""
-        st.session_state["kline_freq"] = _qp_get(qp, "freq") or "1d"
+        st.session_state["kline_freq"] = _coerce_kline_freq(_qp_get(qp, "freq"))
         ds = _parse_iso_date(_qp_get(qp, "start"))
         de = _parse_iso_date(_qp_get(qp, "end"))
         st.session_state["kline_start"] = ds if ds is not None else default_start
@@ -77,12 +87,12 @@ def _sync_session_from_query_params(qp, *, full: bool, default_start: date, defa
 
     if _qp_get(qp, "exchange") is not None:
         ex = _qp_get(qp, "exchange")
-        if ex in _EXCH_OPTIONS:
+        if ex in KLINE_EXCHANGE_OPTIONS:
             st.session_state["kline_exchange"] = ex
     if _qp_get(qp, "symbol") is not None:
         st.session_state["kline_symbol"] = _qp_get(qp, "symbol")
     if _qp_get(qp, "freq") is not None:
-        st.session_state["kline_freq"] = _qp_get(qp, "freq")
+        st.session_state["kline_freq"] = _coerce_kline_freq(_qp_get(qp, "freq"))
     if _qp_get(qp, "start") is not None:
         ds = _parse_iso_date(_qp_get(qp, "start"))
         if ds is not None:
@@ -97,11 +107,11 @@ def _sync_session_from_query_params(qp, *, full: bool, default_start: date, defa
 
 def _ensure_kline_session_defaults(default_start: date, default_end: date) -> None:
     if "kline_exchange" not in st.session_state:
-        st.session_state["kline_exchange"] = "as"
+        st.session_state["kline_exchange"] = EXCHANGE_AS
     if "kline_symbol" not in st.session_state:
         st.session_state["kline_symbol"] = "600519"
-    if "kline_freq" not in st.session_state:
-        st.session_state["kline_freq"] = "1d"
+    if "kline_freq" not in st.session_state or st.session_state["kline_freq"] not in KLINE_FREQ_SET:
+        st.session_state["kline_freq"] = KLINE_DEFAULT_FREQ
     if "kline_start" not in st.session_state:
         st.session_state["kline_start"] = default_start
     if "kline_end" not in st.session_state:
@@ -444,7 +454,7 @@ st.caption(
     "服务地址在 `.streamlit/secrets.toml` 配置 `FLIGHT_URL`（或环境变量 `FLIGHT_URL`）。"
     "图表时间为**东八区**（Asia/Shanghai）墙钟；`pd.to_datetime(..., utc=True)` 按 **UTC** 解析后再转换。"
     "横轴为**分类轴**，只显示接口返回的有 K 线的时点，休市日不会出现空档刻度。"
-    "完整查询参数示例：`?symbol=600519&exchange=as&freq=1d&start=2024-01-01&end=2025-01-01`（可选 `reverse=1`），"
+    "完整查询参数示例：`?symbol=600519&exchange=as&freq=1d&start=2024-01-01&end=2025-01-01`（`exchange` 可为 `as` / `ths` / `asindex`；可选 `reverse=1`），"
     "带齐 **symbol、freq、start、end** 时自动拉图；否则点「确定」。"
 )
 
@@ -456,17 +466,23 @@ url_complete = _query_params_fully_specified(qp)
 _ensure_kline_session_defaults(default_start, default_end)
 _sync_session_from_query_params(qp, full=url_complete, default_start=default_start, default_end=default_end)
 
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns(2)
 with c1:
     exchange = st.selectbox(
         "交易所 / 类型",
-        options=list(_EXCH_OPTIONS),
+        options=list(KLINE_EXCHANGE_OPTIONS),
         key="kline_exchange",
     )
 with c2:
     symbol = st.text_input("代码", key="kline_symbol", placeholder="600519 或 sh000300")
-with c3:
-    kline_freq = st.text_input("K 线周期", key="kline_freq", help="与 Flight tag 一致，如 1d、1h")
+
+kline_freq = st.radio(
+    "K 线周期",
+    options=list(KLINE_FREQ_OPTIONS),
+    key="kline_freq",
+    horizontal=True,
+    help="与 Flight tag 一致，对应 URL 参数 `freq`。不在列表中的 `freq` 会回落为 1d。",
+)
 
 c4, c5 = st.columns(2)
 with c4:

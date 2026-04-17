@@ -13,9 +13,10 @@ pages = {
         st.Page("views/dashboard_em.py", title="EM", icon="🌍"),
     ],
     "AS": [
+        st.Page("views/today_opportunities.py", title="今日机会", icon="🎯", default=True),
         st.Page("views/review_index.py", title="大盘", icon="📈"),
         st.Page("views/kline.py", title="K线", icon="🕯️"),
-        st.Page("views/review_hotspot.py", title="板块热点", icon="🔥", default=True),
+        st.Page("views/review_hotspot.py", title="板块热点", icon="🔥"),
         st.Page("views/active_vol_then_nestedbc.py", title="active_vol_then_nestedbc", icon="📉"),
         st.Page("views/nested_bc.py", title="nested_bc", icon="📊"),
         st.Page("views/profit_pattern_cl3b_zsx.py", title="CL3B ZSX", icon="📈"),
@@ -35,6 +36,9 @@ pages = {
         st.Page("views/sector_signals.py", title="Sector Signals", icon="🏢"),
         st.Page("views/search_signals.py", title="Search Signals", icon="🔍"),
     ],
+    "Tools": [
+        st.Page("views/instrument_groups.py", title="Instrument Groups", icon="📁"),
+    ],
     "ML": [
         st.Page("views/ml_scores.py", title="ML Scores", icon="🤖"),
     ],
@@ -44,41 +48,8 @@ pages = {
 pg = st.navigation(pages, position="top")
 
 
-# Create a database connection using Streamlit's connection API
-def _get_conn_str():
-    """Get PostgreSQL connection string from secrets or environment."""
-    import os
-    try:
-        return st.secrets["connections"]["quantdb"]["url"]
-    except (KeyError, FileNotFoundError, Exception):
-        pass
-    return os.environ.get("DATABASE_URL")
-
-
-@st.cache_resource
-def get_connection():
-    """Create a database connection using Streamlit's connection API."""
-    import os
-    import streamlit as st
-    import psycopg
-
-    conn_str = _get_conn_str()
-    if not conn_str:
-        st.error(
-            "未配置数据库连接。请任选其一：\n"
-            "1. 复制 `.streamlit/secrets.toml.example` 为 `.streamlit/secrets.toml` 并填入 `[connections.quantdb] url`\n"
-            "2. 或设置环境变量 `DATABASE_URL`"
-        )
-        st.stop()
-
-    try:
-        from streamlit.connections import SQLConnection
-        return st.connection('quantdb', type=SQLConnection, url=conn_str)
-    except Exception:
-        return psycopg.connect(conn_str)
-
-# Import the centralized load_data function
-from data import load_data
+# Import shared data layer
+from data import load_data, _get_conn_str
 from signal_constants import SIGNAL_NAME_PREFIXES_PRELOAD
 
 

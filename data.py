@@ -351,8 +351,11 @@ def load_data(time_window_days: int = 30, start_date: str | None = None, end_dat
     from utils import normalize_signal_date_field
     import psycopg
     
-    conn_str = st.secrets["connections"]["quantdb"]["url"]
-    
+    conn_str = _get_conn_str()
+    if not conn_str:
+        st.error("未配置数据库连接。")
+        return pd.DataFrame()
+
     try:
         with psycopg.connect(conn_str, connect_timeout=120) as conn:
             with conn.cursor() as cur:
@@ -417,36 +420,216 @@ def load_data(time_window_days: int = 30, start_date: str | None = None, end_dat
 @st.cache_data(ttl=3600)
 def get_sector_constituents_from_db(sector_symbol: str, sector_exchange: str = 'em'):
     """Get constituent stocks for a given sector from the database.
-    
+
     Args:
         sector_symbol: The sector symbol (e.g., 'BK0480')
         sector_exchange: The sector exchange (default: 'em')
-    
+
     Returns:
         List of stock symbols that are constituents of the sector
     """
-    conn_str = st.secrets["connections"]["quantdb"]["url"]
+    sector_sql = """
+        SELECT DISTINCT stock_symbol
+        FROM sector_constituent
+        WHERE sector_symbol = %s
+          AND sector_exchange = %s
+          AND snapshot_date = (
+              SELECT MAX(snapshot_date)
+              FROM sector_constituent
+              WHERE sector_symbol = %s AND sector_exchange = %s
+          )
+    """
+    params = (sector_symbol, sector_exchange, sector_symbol, sector_exchange)
+    _print_sql(sector_sql, params)
     try:
-        import psycopg
-        
-        with psycopg.connect(conn_str) as conn:
-            with conn.cursor() as cur:
-                sector_sql = """
-                    SELECT DISTINCT stock_symbol
-                    FROM sector_constituent
-                    WHERE sector_symbol = %s
-                      AND sector_exchange = %s
-                      AND snapshot_date = (
-                          SELECT MAX(snapshot_date)
-                          FROM sector_constituent
-                          WHERE sector_symbol = %s AND sector_exchange = %s
-                      )
-                """
-                _print_sql(sector_sql, (sector_symbol, sector_exchange, sector_symbol, sector_exchange))
-                cur.execute(sector_sql, (sector_symbol, sector_exchange, sector_symbol, sector_exchange))
-                
-                rows = cur.fetchall()
-                return [row[0] for row in rows]
+        df = _query_df(sector_sql, params)
+        return df["stock_symbol"].tolist() if not df.empty else []
     except Exception as e:
         st.warning(f"Failed to fetch constituents from database for {sector_symbol}: {e}")
+        return []
+
+
+# ============================================================================
+# 共享数据库连接（复用，避免每个函数都新建连接）
+# ============================================================================
+import os
+
+
+def _get_conn_str():
+    """获取 PostgreSQL 连接字符串。"""
+    try:
+        return st.secrets["connections"]["quantdb"]["url"]
+    except (KeyError, FileNotFoundError, Exception):
+        pass
+    return os.environ.get("DATABASE_URL")
+
+
+@st.cache_resource
+def _get_db():
+    """缓存的数据库连接（psycopg），供 data.py 内各函数复用。"""
+    import psycopg
+    conn_str = _get_conn_str()
+    if not conn_str:
+        st.error("未配置数据库连接。请检查 .streamlit/secrets.toml 或 DATABASE_URL 环境变量。")
+        st.stop()
+    return psycopg.connect(conn_str)
+
+
+def _with_retry(operation):
+    """包装数据库操作，在连接断开时自动重建并重试一次。"""
+    import time
+    import psycopg
+    conn = _get_db()
+    try:
+        return operation(conn)
+    except psycopg.Error:
+        _get_db.clear()
+        time.sleep(0.5)
+        conn = _get_db()
+        return operation(conn)
+
+
+def _query_df(query: str, params=None) -> pd.DataFrame:
+    """执行 SELECT，返回 DataFrame。"""
+    def _do_query(conn):
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            cols = [desc[0] for desc in cur.description]
+            return pd.DataFrame(rows, columns=cols)
+    return _with_retry(_do_query)
+
+
+def _execute(query: str, params=None) -> int:
+    """执行 INSERT / UPDATE / DELETE，返回 affected rowcount。"""
+    def _do_execute(conn):
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            conn.commit()
+            return cur.rowcount
+    return _with_retry(_do_execute)
+
+
+# ============================================================================
+# 自选股分组管理
+# ============================================================================
+def get_instrument_groups() -> pd.DataFrame:
+    """获取所有自选股分组。"""
+    try:
+        return _query_df("""
+            SELECT g.name, g.description, g.created_at, g.updated_at,
+                   COUNT(m.id) as member_count
+            FROM instrument_group g
+            LEFT JOIN instrument_group_member m ON g.name = m.group_name
+            GROUP BY g.name, g.description, g.created_at, g.updated_at
+            ORDER BY g.name
+        """)
+    except Exception as e:
+        st.error(f"Failed to fetch instrument groups: {e}")
+        return pd.DataFrame()
+
+
+def create_instrument_group(name: str, description: str | None = None) -> bool:
+    """创建自选股分组。"""
+    try:
+        return _execute(
+            "INSERT INTO instrument_group (name, description) VALUES (%s, %s) ON CONFLICT (name) DO NOTHING",
+            (name, description)
+        ) > 0
+    except Exception as e:
+        st.error(f"Failed to create instrument group: {e}")
+        return False
+
+
+def delete_instrument_group(name: str) -> bool:
+    """删除自选股分组。"""
+    try:
+        return _execute("DELETE FROM instrument_group WHERE name = %s", (name,)) > 0
+    except Exception as e:
+        st.error(f"Failed to delete instrument group: {e}")
+        return False
+
+
+def get_instrument_group_members(group_name: str) -> pd.DataFrame:
+    """获取指定分组的成员列表。"""
+    try:
+        return _query_df("""
+            SELECT m.exchange, m.symbol, i.name as instrument_name, m.created_at
+            FROM instrument_group_member m
+            LEFT JOIN instrument i ON m.exchange = i.exchange AND m.symbol = i.symbol
+            WHERE m.group_name = %s
+            ORDER BY m.exchange, m.symbol
+        """, (group_name,))
+    except Exception as e:
+        st.error(f"Failed to fetch group members: {e}")
+        return pd.DataFrame()
+
+
+def add_instrument_group_member(group_name: str, exchange: str, symbol: str) -> bool:
+    """向分组添加成员。"""
+    try:
+        return _execute(
+            """INSERT INTO instrument_group_member (group_name, exchange, symbol)
+               VALUES (%s, %s, %s)
+               ON CONFLICT (group_name, exchange, symbol) DO NOTHING""",
+            (group_name, exchange, symbol)
+        ) > 0
+    except Exception as e:
+        st.error(f"Failed to add group member: {e}")
+        return False
+
+
+def remove_instrument_group_member(group_name: str, exchange: str, symbol: str) -> bool:
+    """从分组移除成员。"""
+    try:
+        return _execute(
+            "DELETE FROM instrument_group_member WHERE group_name = %s AND exchange = %s AND symbol = %s",
+            (group_name, exchange, symbol)
+        ) > 0
+    except Exception as e:
+        st.error(f"Failed to remove group member: {e}")
+        return False
+
+
+def search_instruments(query: str, limit: int = 50) -> pd.DataFrame:
+    """按代码、名称或别名搜索 instrument 表。"""
+    try:
+        return _query_df("""
+            SELECT exchange, symbol, name, sub_exchange, alias
+            FROM instrument
+            WHERE symbol ILIKE %s
+               OR name ILIKE %s
+               OR EXISTS (
+                   SELECT 1 FROM jsonb_array_elements_text(alias) AS a
+                   WHERE a ILIKE %s
+               )
+            ORDER BY exchange, symbol
+            LIMIT %s
+        """, (f"%{query}%", f"%{query}%", f"%{query}%", limit))
+    except Exception as e:
+        st.error(f"Failed to search instruments: {e}")
+        return pd.DataFrame()
+
+
+def get_instruments_by_exchange(exchange: str) -> pd.DataFrame:
+    """按交易所获取所有 instrument。"""
+    try:
+        return _query_df("""
+            SELECT exchange, symbol, name, sub_exchange
+            FROM instrument
+            WHERE exchange = %s
+            ORDER BY symbol
+        """, (exchange,))
+    except Exception as e:
+        st.error(f"Failed to fetch instruments: {e}")
+        return pd.DataFrame()
+
+
+def get_exchanges() -> list[str]:
+    """获取 instrument 表中所有不重复的交易所列表。"""
+    try:
+        df = _query_df("SELECT DISTINCT exchange FROM instrument ORDER BY exchange")
+        return df["exchange"].tolist() if not df.empty else []
+    except Exception as e:
+        st.warning(f"Failed to fetch exchanges: {e}")
         return []

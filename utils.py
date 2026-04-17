@@ -263,3 +263,60 @@ def display_signals_multiview(
                     include_freq=False,
                     height=height,
                 )
+
+
+# ============================================================================
+# 通用 Instrument 搜索选择器（复用组件）
+# ============================================================================
+from data import search_instruments
+
+
+def instrument_search_picker(
+    key_prefix: str = "search",
+    limit: int = 100,
+) -> pd.DataFrame:
+    """
+    通用 Instrument 搜索+多选组件。
+
+    返回用户勾选选中的 instrument 行 DataFrame（含 exchange, symbol, name, sub_exchange）。
+    未选择时返回空 DataFrame。
+
+    Args:
+        key_prefix: Streamlit widget key 前缀，避免同一页多个实例冲突
+        limit: 单次搜索返回上限
+    """
+    query = st.text_input(
+        "搜索代码、名称或别名",
+        placeholder="输入代码、名称或别名关键字",
+        key=f"{key_prefix}_query",
+    )
+
+    if not query.strip():
+        return pd.DataFrame()
+
+    results = search_instruments(query.strip(), limit=limit)
+    if results.empty:
+        st.info("未找到匹配的标的")
+        return pd.DataFrame()
+
+    st.write(f"找到 {len(results)} 个结果")
+    results = results.copy()
+    results["选择"] = False
+
+    edited = st.data_editor(
+        results,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "exchange": st.column_config.TextColumn("交易所", disabled=True),
+            "symbol": st.column_config.TextColumn("代码", disabled=True),
+            "name": st.column_config.TextColumn("名称", disabled=True),
+            "alias": st.column_config.TextColumn("别名", disabled=True),
+            "sub_exchange": st.column_config.TextColumn("子交易所", disabled=True),
+            "选择": st.column_config.CheckboxColumn("选择", default=False),
+        },
+        key=f"{key_prefix}_editor",
+    )
+
+    selected = edited[edited["选择"] == True]
+    return selected[[c for c in selected.columns if c != "选择"]]

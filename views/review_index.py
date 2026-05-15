@@ -1,6 +1,5 @@
-import pandas as pd
 import streamlit as st
-from utils import display_signals_multiview
+from utils import display_signals_multiview, get_cached_data
 
 # ============================================================================
 # 📈 大盘 - 指数信号
@@ -17,7 +16,7 @@ st.markdown("""
 st.divider()
 
 # 获取数据
-df = st.session_state.df
+df = get_cached_data(45)
 
 if df.empty:
     st.warning("暂无数据")

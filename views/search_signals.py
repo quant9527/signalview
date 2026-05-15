@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from utils import get_cached_data
 from pypinyin import lazy_pinyin, Style
 
 # 获取查询参数
@@ -64,7 +65,7 @@ with nav_col2:
         st.query_params["exchange"] = "binance"
         st.rerun()
 
-df = st.session_state.df
+df = get_cached_data(45)
 
 # Time range slider for all modes
 if 'signal_date' in df.columns:

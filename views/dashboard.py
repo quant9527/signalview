@@ -2,14 +2,13 @@
 Dashboard 公共逻辑：按 exchange 筛选并展示信号。
 供 dashboard_as / dashboard_em / dashboard_binance 调用。
 """
-import pandas as pd
 import streamlit as st
-from utils import display_signals_multiview
+from utils import display_signals_multiview, get_cached_data
 
 
 def render_dashboard(exchange: str) -> None:
     """
-    按指定 exchange 筛选 session_state.df 并多视图展示信号。
+    按指定 exchange 筛选缓存数据并多视图展示信号。
 
     Args:
         exchange: 交易所/数据源标识，如 "as" | "em" | "binance"
@@ -20,7 +19,7 @@ def render_dashboard(exchange: str) -> None:
     st.header(f"Dashboard — {title}")
     st.divider()
 
-    df = st.session_state.df
+    df = get_cached_data(45)
     if df.empty:
         st.warning("暂无数据")
         return

@@ -1,12 +1,12 @@
 import pandas as pd
 import streamlit as st
-from datetime import datetime, timedelta
-from data import get_sector_constituents_from_db, create_all_signals_columns
-from signal_constants import CMP_SIGNAL_NAMES
+from datetime import timedelta
+from data import get_sector_constituents_from_db
+from utils import get_cached_data
 
 # ============================================================================
 # 🎯 Today Opportunities - 今日机会雷达
-# 
+#
 # 核心设计：
 # 1. 只关注今日新增信号，过滤历史噪音
 # 2. 信号质量评分，优先展示高价值机会
@@ -17,7 +17,7 @@ from signal_constants import CMP_SIGNAL_NAMES
 st.header("🎯 今日机会雷达")
 
 # 获取数据
-df = st.session_state.df
+df = get_cached_data(45)
 
 if df.empty:
     st.warning("暂无数据")

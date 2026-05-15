@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 import streamlit as st
 
@@ -268,7 +270,60 @@ def display_signals_multiview(
 # ============================================================================
 # 通用 Instrument 搜索选择器（复用组件）
 # ============================================================================
-from data import search_instruments
+from data import search_instruments  # noqa: E402
+
+
+@st.cache_data(ttl=300)
+def get_cached_data(
+    time_window_days: int = 30,
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    signal_name_prefix: str | None = None,
+) -> pd.DataFrame:
+    """
+    Load signals with caching. Same parameters as load_data but cached within
+    a Streamlit session to avoid redundant DB calls on re-renders.
+    """
+    from data import load_data
+    return load_data(
+        time_window_days=time_window_days,
+        start_date=start_date,
+        end_date=end_date,
+        signal_name_prefix=signal_name_prefix,
+    )
+
+
+def checkbox_data_editor(
+    df: pd.DataFrame,
+    *,
+    checkbox_label: str = "选择",
+    disabled: list[str] | None = None,
+    column_config_overrides: dict[str, Any] | None = None,
+    key: str,
+) -> pd.DataFrame:
+    """
+    Show a read-only DataFrame with a checkbox column for row selection.
+
+    Returns a DataFrame containing only the rows where the checkbox was True,
+    with the checkbox column removed. Returns empty DataFrame if none selected.
+    """
+    data = df.copy()
+    data[checkbox_label] = False
+    all_cols = {col: st.column_config.TextColumn(col, disabled=True) for col in df.columns}
+    if column_config_overrides:
+        all_cols.update(column_config_overrides)
+    all_cols[checkbox_label] = st.column_config.CheckboxColumn(checkbox_label, default=False)
+    edited = st.data_editor(
+        data,
+        hide_index=True,
+        width="stretch",
+        column_config=all_cols,
+        disabled=[*[c for c in (disabled or []) if c in df.columns]],
+        key=key,
+    )
+    selected = edited[edited[checkbox_label]]
+    return selected[[c for c in selected.columns if c != checkbox_label]]
 
 
 def instrument_search_picker(
@@ -300,23 +355,11 @@ def instrument_search_picker(
         return pd.DataFrame()
 
     st.write(f"找到 {len(results)} 个结果")
-    results = results.copy()
-    results["选择"] = False
-
-    edited = st.data_editor(
+    cols_to_disable = ["exchange", "symbol", "name", "alias", "sub_exchange"]
+    selected = checkbox_data_editor(
         results,
-        hide_index=True,
-        width="stretch",
-        column_config={
-            "exchange": st.column_config.TextColumn("交易所", disabled=True),
-            "symbol": st.column_config.TextColumn("代码", disabled=True),
-            "name": st.column_config.TextColumn("名称", disabled=True),
-            "alias": st.column_config.TextColumn("别名", disabled=True),
-            "sub_exchange": st.column_config.TextColumn("子交易所", disabled=True),
-            "选择": st.column_config.CheckboxColumn("选择", default=False),
-        },
+        checkbox_label="选择",
+        disabled=cols_to_disable,
         key=f"{key_prefix}_editor",
     )
-
-    selected = edited[edited["选择"] == True]
-    return selected[[c for c in selected.columns if c != "选择"]]
+    return selected

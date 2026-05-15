@@ -1,11 +1,11 @@
 import pandas as pd
 import streamlit as st
 from signal_constants import CL3B_ZSX_PREFIX
-from utils import display_signals_multiview
+from utils import display_signals_multiview, get_cached_data
 
 # ============================================================================
 # 盈利模式: CL3B ZSX 信号追踪
-# 
+#
 # 模式说明：
 # 筛选 cl3b_zsx 系列信号的标的，跟踪信号表现
 # ============================================================================
@@ -19,10 +19,13 @@ st.markdown("""
 - ⏰ **关注重点**：信号出现后的走势跟踪
 """)
 
+TARGET_SIGNAL_PREFIX = CL3B_ZSX_PREFIX
+
 st.divider()
 
 # 获取数据
-df = st.session_state.df
+df_full = get_cached_data(45)
+df = df_full[df_full["signal_name"].str.startswith(TARGET_SIGNAL_PREFIX, na=False)].copy()
 
 if df.empty:
     st.warning("暂无数据")
@@ -31,7 +34,6 @@ if df.empty:
 # ============================================================================
 # 配置区域（紧凑显示）
 # ============================================================================
-TARGET_SIGNAL_PREFIX = CL3B_ZSX_PREFIX
 
 # 获取所有匹配的信号类型和可用周期
 all_matching_signals = df[df['signal_name'].str.startswith(TARGET_SIGNAL_PREFIX, na=False)]['signal_name'].unique().tolist()

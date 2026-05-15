@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from signal_constants import CL3B_ZSX_PREFIX
+from utils import get_cached_data
 
 
 def _match_signal(series: pd.Series, pattern: str, mode: str) -> pd.Series:
@@ -104,7 +105,8 @@ st.markdown(
 """
 )
 
-df = st.session_state.df
+df_full = get_cached_data(45)
+df = df_full.copy()
 if df.empty:
     st.warning("暂无数据")
     st.stop()

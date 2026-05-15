@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from data import get_sector_constituents_from_db, create_all_signals_columns
 from signal_constants import CMP_SIGNAL_NAMES
-from utils import display_signals_compact, display_signals_multiview
+from utils import display_signals_multiview, get_cached_data
 
 # ============================================================================
 # 🔥 Hotspot - 热点追踪
@@ -23,7 +23,7 @@ st.markdown("""
 st.divider()
 
 # 获取数据
-df = st.session_state.df
+df = get_cached_data(45)
 
 if df.empty:
     st.warning("暂无数据")
@@ -188,7 +188,7 @@ else:
                         st.write(f"**🎯 成分股信号 ({len(constituent_df['symbol'].unique())}/{len(constituent_codes)}):**")
                         display_signals_multiview(constituent_df, height=400)
                     else:
-                        st.info(f"成分股中暂无信号")
+                        st.info("成分股中暂无信号")
                 else:
                     st.info(f"未找到 {sector_symbol} 的成分股数据")
 

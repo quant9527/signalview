@@ -1,4 +1,3 @@
-import pandas as pd
 import streamlit as st
 
 from data import (
@@ -9,74 +8,20 @@ from data import (
     add_instrument_group_member,
     remove_instrument_group_member,
 )
-from utils import instrument_search_picker
+from utils import instrument_search_picker, checkbox_data_editor
 
 st.header("自选股分组管理")
 st.caption("管理自定义标的分组，供 quant-lab 回测时通过 target=组名 自动选中")
 st.divider()
 
 # ============================================================================
-# 左侧：分组列表
+# 上方两列：分组成员管理(左宽) | 新建分组(右窄)
 # ============================================================================
 groups_df = get_instrument_groups()
 
-if groups_df.empty:
-    st.info("暂无分组，请在下方新建分组。")
-
-col_left, col_right = st.columns([1, 2])
+col_left, col_right = st.columns([2, 1])
 
 with col_left:
-    st.subheader("分组列表")
-    if not groups_df.empty:
-        st.dataframe(
-            groups_df[["name", "member_count", "description"]],
-            hide_index=True,
-            width='stretch',
-            column_config={
-                "name": st.column_config.TextColumn("分组名称", width="medium"),
-                "member_count": st.column_config.NumberColumn("标的数", width="small"),
-                "description": st.column_config.TextColumn("描述", width="large"),
-            },
-        )
-    else:
-        st.info("暂无分组")
-
-    st.divider()
-    st.subheader("新建分组")
-    with st.form("create_group_form", clear_on_submit=True):
-        new_group_name = st.text_input("分组名称", placeholder="如 position")
-        new_group_desc = st.text_input("描述", placeholder="可选")
-        submitted = st.form_submit_button("创建分组", width='stretch')
-        if submitted:
-            name = new_group_name.strip()
-            if not name:
-                st.warning("分组名称不能为空")
-            elif create_instrument_group(name, new_group_desc.strip() or None):
-                st.success(f"分组 `{name}` 创建成功")
-                st.rerun()
-            else:
-                st.warning(f"分组 `{name}` 可能已存在")
-
-    if not groups_df.empty:
-        st.divider()
-        st.subheader("删除分组")
-        group_to_delete = st.selectbox(
-            "选择要删除的分组",
-            options=groups_df["name"].tolist(),
-            key="delete_group_select",
-        )
-        if st.button("删除分组", type="primary", width='stretch'):
-            if delete_instrument_group(group_to_delete):
-                st.success(f"分组 `{group_to_delete}` 已删除")
-                st.rerun()
-            else:
-                st.error("删除失败")
-
-
-# ============================================================================
-# 右侧：分组成员管理
-# ============================================================================
-with col_right:
     if groups_df.empty:
         st.info("请先创建分组")
     else:
@@ -145,3 +90,56 @@ with col_right:
                             added_count += 1
                     st.success(f"已添加 {added_count} 个标的")
                     st.rerun()
+
+def _handle_create_group(name: str, desc: str | None) -> bool:
+    """Create a group. Returns True if created, False if name empty or already exists."""
+    name = name.strip()
+    if not name:
+        st.warning("分组名称不能为空")
+        return False
+    if create_instrument_group(name, desc):
+        st.success(f"分组 `{name}` 创建成功")
+        st.rerun()
+        return True
+    st.warning(f"分组 `{name}` 可能已存在")
+    return False
+
+
+with col_right:
+    st.subheader("新建分组")
+    with st.form("create_group_form", clear_on_submit=True):
+        new_group_name = st.text_input("分组名称", placeholder="如 position")
+        new_group_desc = st.text_input("描述", placeholder="可选")
+        submitted = st.form_submit_button("创建分组", width='stretch')
+        if submitted:
+            _handle_create_group(new_group_name, new_group_desc.strip() or None)
+
+st.divider()
+
+# ============================================================================
+# 下方：分组列表（全宽）
+# ============================================================================
+st.subheader("分组列表")
+if not groups_df.empty:
+    selected_for_delete = checkbox_data_editor(
+        groups_df[["name", "member_count", "description"]],
+        checkbox_label="删除",
+        disabled=["name", "member_count", "description"],
+        column_config_overrides={
+            "name": st.column_config.TextColumn("分组名称", width="medium"),
+            "member_count": st.column_config.NumberColumn("标的数", width="small"),
+            "description": st.column_config.TextColumn("描述", width="large"),
+        },
+        key="groups_editor",
+    )
+    to_delete = selected_for_delete["name"].tolist()
+    if to_delete:
+        if st.button(f"删除选中的 {len(to_delete)} 个分组", type="primary", width='stretch'):
+            deleted = 0
+            for g in to_delete:
+                if delete_instrument_group(g):
+                    deleted += 1
+            st.success(f"已删除 {deleted} 个分组")
+            st.rerun()
+else:
+    st.info("暂无分组，请在下方新建分组。")

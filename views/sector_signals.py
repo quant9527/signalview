@@ -1,11 +1,12 @@
 import pandas as pd
 import streamlit as st
 from data import create_all_signals_columns
+from utils import get_cached_data
 
 
 st.header("Sector Multi/Signal Analysis")
 
-df = st.session_state.df
+df = get_cached_data(45)
 
 # Sidebar for symbol input
 st.sidebar.subheader("Symbol List Filter")

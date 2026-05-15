@@ -1,9 +1,10 @@
 import pandas as pd
 import streamlit as st
+from utils import get_cached_data
 
 st.title("Signal Overview")
 
-df = st.session_state.df
+df = get_cached_data(45)
 
 if df.empty:
     st.warning("No data loaded.")

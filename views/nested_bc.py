@@ -3,7 +3,7 @@ import streamlit as st
 from constants import EXCHANGE_AS
 from performance_table import render_performance_signal_table
 from signal_constants import NESTED_2BC_LONG_FREQS, NESTED_2BC_PREFIX
-from utils import display_signals_multiview
+from utils import display_signals_multiview, get_cached_data
 
 # ============================================================================
 # nested_2bc（1w / 1d）
@@ -16,7 +16,8 @@ st.markdown(f"""
 
 st.divider()
 
-df = st.session_state.df
+df_full = get_cached_data(45)
+df = df_full[df_full["signal_name"].str.startswith(NESTED_2BC_PREFIX, na=False)].copy()
 
 if df.empty:
     st.warning("暂无数据")
@@ -136,7 +137,7 @@ else:
     )
     render_performance_signal_table(
         as_df,
-        st.session_state.df,
+        df_full,
         exchange=EXCHANGE_AS,
         key_prefix="nested_bc_rank",
         show_summary_info=False,

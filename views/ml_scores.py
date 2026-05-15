@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from utils import get_cached_data
 
 # 仓库根目录下的默认训练产物（与 `signalml-train ... --out ./artifacts/run1` 一致）
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -53,7 +54,7 @@ meta = {}
 if meta_path.is_file():
     meta = yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
 
-df = st.session_state.df.copy()
+df = get_cached_data(45)
 ex_f = meta.get("exchange_filter")
 if ex_f and "exchange" in df.columns:
     df = df[df["exchange"].astype(str) == str(ex_f)].copy()
@@ -74,7 +75,7 @@ else:
     df_show = df.copy()
 
 try:
-    scores = predict_scores(df_show, artifact_dir, context_df=st.session_state.df)
+    scores = predict_scores(df_show, artifact_dir, context_df=df)
 except Exception as e:
     st.error(f"预测失败: {e}")
     st.stop()

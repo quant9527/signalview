@@ -1,11 +1,12 @@
 import pandas as pd
 import streamlit as st
 from data import create_all_signals_columns
+from utils import get_cached_data
 
 
 st.header("All Signals Grouped by Symbol")
 
-df = st.session_state.df
+df = get_cached_data(45)
 
 # Apply shared signal selection filter if available
 if "selected_signals" in st.session_state and st.session_state["selected_signals"]:

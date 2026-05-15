@@ -359,7 +359,7 @@ def load_data(time_window_days: int = 30, start_date: str | None = None, end_dat
     try:
         with psycopg.connect(conn_str, connect_timeout=120) as conn:
             with conn.cursor() as cur:
-                # 不查询 debug_info 字段，该字段数据量太大会导致传输极慢
+                # 不查询 info 字段，该字段数据量太大会导致传输极慢
                 columns = "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, signal_date, signal_name, signal, reason, price, score, shares, version, created_at, updated_at, reverse, side"
                 signal_filter = " AND signal_name LIKE %s" if signal_name_prefix else ""
                 params: list = []

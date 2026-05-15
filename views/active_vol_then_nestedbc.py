@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 from signal_constants import ACTIVE_VOL_NESTED_SHORT_FREQS
-from utils import display_signals_multiview
+from utils import display_signals_multiview, get_cached_data
 
 
 # ============================================================================
@@ -23,7 +23,8 @@ st.markdown("""
 st.divider()
 
 # 获取数据
-df = st.session_state.df
+df_full = get_cached_data(45)
+df = df_full[df_full["signal_name"].str.startswith("active_vol_then_nestedbc", na=False)].copy()
 
 if df.empty:
     st.warning("暂无数据")

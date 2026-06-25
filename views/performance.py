@@ -5,6 +5,7 @@ import streamlit as st
 
 from constants import EXCHANGE_AS, EXCHANGE_THS
 from signal_constants import PERFORMANCE_PRESET_AS_PREFIXES, PERFORMANCE_PRESET_THS_PREFIXES
+from utils import get_cached_data
 
 _PRESETS = [
     (EXCHANGE_AS, PERFORMANCE_PRESET_AS_PREFIXES, EXCHANGE_AS),
@@ -22,4 +23,5 @@ for label, main_signal, exchange in _PRESETS:
         break
 
 _root = Path(__file__).resolve().parent.parent
+st.session_state.df = get_cached_data(45)
 exec((_root / "performance.py").read_text(encoding="utf-8"))

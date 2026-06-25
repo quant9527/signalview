@@ -52,6 +52,7 @@ def build_kline_tags(symbols: list[str], exchange: str, kline_freq: str = "1d") 
     - exchange=as：个股 6 位代码，如 as_600519_1d
     - exchange=ths：同个股 6 位规范，如 ths_600519_1d
     - exchange=asindex：指数带 sh/sz，如 asindex_sh000300_1d（沪深300）
+    - exchange=hyperliquid：crypto pair，如 hyperliquid_BTC_1d、hyperliquid_BTC-USDT_1d
     """
     ex = str(exchange).strip() or "as"
     fq = str(kline_freq).strip() or "1d"
@@ -61,6 +62,13 @@ def build_kline_tags(symbols: list[str], exchange: str, kline_freq: str = "1d") 
             sym = _norm_asindex_symbol(raw)
             if sym:
                 tags.append(f"{EXCHANGE_ASINDEX}_{sym}_{fq}")
+        return tags
+    if ex.lower() == "hyperliquid":
+        tags = []
+        for raw in symbols:
+            sym = str(raw).strip().upper()
+            if sym:
+                tags.append(f"hyperliquid_{sym}_{fq}")
         return tags
     codes = [_norm_symbol_6(s) for s in symbols]
     codes = [c for c in codes if c.isdigit() and len(c) == 6]

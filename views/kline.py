@@ -26,6 +26,7 @@ from constants import (
     KLINE_FREQ_OPTIONS,
     KLINE_FREQ_SET,
 )
+from data import get_instruments_by_exchange
 
 TZ_SHANGHAI = ZoneInfo("Asia/Shanghai")
 
@@ -454,7 +455,7 @@ st.caption(
     "服务地址在 `.streamlit/secrets.toml` 配置 `FLIGHT_URL`（或环境变量 `FLIGHT_URL`）。"
     "图表时间为**东八区**（Asia/Shanghai）墙钟；`pd.to_datetime(..., utc=True)` 按 **UTC** 解析后再转换。"
     "横轴为**分类轴**，只显示接口返回的有 K 线的时点，休市日不会出现空档刻度。"
-    "完整查询参数示例：`?symbol=600519&exchange=as&freq=1d&start=2024-01-01&end=2025-01-01`（`exchange` 可为 `as` / `ths` / `asindex`；可选 `reverse=1`），"
+    "完整查询参数示例：`?symbol=600519&exchange=as&freq=1d&start=2024-01-01&end=2025-01-01`（`exchange` 可为 `as` / `ths` / `asindex` / `hyperliquid`；可选 `reverse=1`），"
     "带齐 **symbol、freq、start、end** 时自动拉图；否则点「确定」。"
 )
 
@@ -474,7 +475,26 @@ with c1:
         key="kline_exchange",
     )
 with c2:
-    symbol = st.text_input("代码", key="kline_symbol", placeholder="600519 或 sh000300")
+    instruments_df = get_instruments_by_exchange(exchange)
+    if not instruments_df.empty:
+        symbol_to_label = {
+            row["symbol"]: f"{row['symbol']} - {row['name']}"
+            for _, row in instruments_df.iterrows()
+        }
+        sym_options = sorted(symbol_to_label.keys())
+        st.selectbox(
+            "代码",
+            options=sym_options,
+            format_func=lambda s: symbol_to_label.get(s, s),
+            key="kline_symbol",
+        )
+    else:
+        placeholder = (
+            "600519 或 sh000300"
+            if exchange != "hyperliquid" else
+            "BTC、ETH、BTC-USDT"
+        )
+        st.text_input("代码", key="kline_symbol", placeholder=placeholder)
 
 kline_freq = st.radio(
     "K 线周期",
@@ -483,6 +503,7 @@ kline_freq = st.radio(
     horizontal=True,
     help="与 Flight tag 一致，对应 URL 参数 `freq`。不在列表中的 `freq` 会回落为 1d。",
 )
+
 
 c4, c5 = st.columns(2)
 with c4:
@@ -503,7 +524,7 @@ if not run_fetch:
     st.info("填写参数后点击「确定」加载 K 线；或在 URL 中提供 **symbol、freq、start、end** 自动加载。")
     st.stop()
 
-symbol = str(symbol).strip()
+symbol = str(st.session_state.get("kline_symbol", "")).strip()
 if not symbol:
     st.error("请输入代码。")
     st.stop()
@@ -512,9 +533,17 @@ if start_d > end_d:
     st.error("开始日期不能晚于结束日期。")
     st.stop()
 
+start_ms = int(pd.Timestamp(start_d).timestamp() * 1000)
+end_ms = int(pd.Timestamp(end_d).replace(hour=23, minute=59, second=59).timestamp() * 1000)
+
 tags = fkc.build_kline_tags([symbol], exchange, kline_freq)
 if not tags:
-    st.error("代码无效：个股请填 6 位数字；指数请用 sh/sz + 6 位，如 sh000300。")
+    hint = (
+        "个股请填 6 位数字；指数请用 sh/sz + 6 位，如 sh000300"
+        if exchange != "hyperliquid" else
+        "Hyperliquid 请填交易对，如 BTC、ETH、BTC-USDT"
+    )
+    st.error(f"代码无效：{hint}。")
     st.stop()
 
 st.caption(f"tags = {tags!r}")
@@ -523,9 +552,6 @@ sym_key = _symbol_key_from_tags(tags)
 if not sym_key:
     st.error("无法解析标的标识，请检查代码与交易所类型。")
     st.stop()
-
-start_ms = int(pd.Timestamp(start_d).timestamp() * 1000)
-end_ms = int(pd.Timestamp(end_d).replace(hour=23, minute=59, second=59).timestamp() * 1000)
 
 flight_url = _resolve_flight_url()
 
@@ -555,10 +581,8 @@ if "exchange" in raw.columns:
     sub = raw[raw["exchange"].astype(str).str.lower() == ex_l].copy()
 else:
     sub = raw.copy()
-
 if "symbol" in sub.columns:
     sub = sub[sub["symbol"].astype(str).str.lower() == sym_key].copy()
-
 if sub.empty:
     st.warning("未找到与请求匹配的标的行（请核对 exchange 与代码）。")
     st.stop()

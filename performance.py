@@ -2,6 +2,7 @@ import streamlit as st
 from constants import EXCHANGE_AS, EXCHANGE_EM, EXCHANGE_THS, EXCHANGE_BINANCE
 from performance_table import render_performance_signal_table
 from signal_constants import SIGNAL_NAME_PREFIXES_PRELOAD
+from utils import get_cached_data
 
 PERF_OTHER_GROUP = "other"
 
@@ -46,7 +47,16 @@ def _group_signals_by_prefix(
     return out
 
 
-df_full = st.session_state.df.copy()
+def _get_performance_df():
+    """Allow the page to work even when opened directly without preloaded state."""
+    df = st.session_state.get("df")
+    if df is None:
+        df = get_cached_data(45)
+        st.session_state.df = df
+    return df.copy()
+
+
+df_full = _get_performance_df()
 
 # Get main signal from session state (set by parent page)
 main_signal = st.session_state.get("main_signal", "")

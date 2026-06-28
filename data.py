@@ -346,11 +346,19 @@ def _print_sql(query: str, params: tuple | list | None = None):
 
 
 @st.cache_data(ttl=600, show_spinner="正在连接数据库（Neon 冷启动可能需要 1-2 分钟）...")
-def load_data(time_window_days: int = 30, start_date: str | None = None, end_date: str | None = None, signal_name_prefix: str | None = None):
-    """Load signals from the database filtered by a time window. Optional signal_name_prefix filters by signal_name LIKE prefix%."""
+def load_data(time_window_days: int = 30, start_date: str | None = None, end_date: str | None = None,
+              signal_name_prefix: str | None = None, signal_not: str | None = None):
+    """Load signals from the database filtered by a time window.
+
+    Args:
+        time_window_days: look back N days from now (when start_date/end_date not set).
+        start_date, end_date: explicit date range (takes precedence over time_window_days).
+        signal_name_prefix: optional filter by signal_name LIKE '<prefix>%'.
+        signal_not: optional filter to exclude rows where signal = '<value>' (e.g. 'SELL').
+    """
     from utils import normalize_signal_date_field
     import psycopg
-    
+
     conn_str = _get_conn_str()
     if not conn_str:
         st.error("未配置数据库连接。")
@@ -361,42 +369,30 @@ def load_data(time_window_days: int = 30, start_date: str | None = None, end_dat
             with conn.cursor() as cur:
                 # 不查询 info 字段，该字段数据量太大会导致传输极慢
                 columns = "id, pick_id, pick_dt, symbol_id, exchange, symbol, freq, symbol_name, signal_date, signal_name, signal, reason, price, score, shares, version, created_at, updated_at, reverse, side"
-                signal_filter = " AND signal_name LIKE %s" if signal_name_prefix else ""
+                clauses = []
                 params: list = []
                 if start_date and end_date:
-                    query = f"""
-                    SELECT {columns}
-                    FROM signal
-                    WHERE signal_date >= %s
-                      AND signal_date < (%s::date + interval '1 day'){signal_filter}
-                    ORDER BY signal_date DESC
-                    """
-                    params = [start_date, end_date]
-                    if signal_name_prefix:
-                        params.append(signal_name_prefix + "%")
-                    _print_sql(query, params)
-                    cur.execute(query, params)
+                    clauses.append("signal_date >= %s")
+                    clauses.append("signal_date < (%s::date + interval '1 day')")
+                    params.extend([start_date, end_date])
                 else:
                     ndays = int(time_window_days) if time_window_days is not None else 30
-                    if signal_name_prefix:
-                        query = f"""
-                        SELECT {columns}
-                        FROM signal
-                        WHERE signal_date >= now() - interval '{ndays} days'
-                          AND signal_name LIKE %s
-                        ORDER BY signal_date DESC
-                        """
-                        _print_sql(query, (signal_name_prefix + "%",))
-                        cur.execute(query, (signal_name_prefix + "%",))
-                    else:
-                        query = f"""
-                        SELECT {columns}
-                        FROM signal
-                        WHERE signal_date >= now() - interval '{ndays} days'
-                        ORDER BY signal_date DESC
-                        """
-                        _print_sql(query)
-                        cur.execute(query)
+                    clauses.append(f"signal_date >= now() - interval '{ndays} days'")
+                if signal_name_prefix:
+                    clauses.append("signal_name LIKE %s")
+                    params.append(signal_name_prefix + "%")
+                if signal_not:
+                    clauses.append("signal != %s")
+                    params.append(signal_not)
+                where = " AND ".join(clauses) if clauses else "TRUE"
+                query = f"""
+                SELECT {columns}
+                FROM signal
+                WHERE {where}
+                ORDER BY signal_date DESC
+                """
+                _print_sql(query, tuple(params) if params else None)
+                cur.execute(query, params or None)
 
                 rows = cur.fetchall()
                 colnames = [desc[0] for desc in cur.description]
@@ -633,3 +629,150 @@ def get_exchanges() -> list[str]:
     except Exception as e:
         st.warning(f"Failed to fetch exchanges: {e}")
         return []
+
+
+# ============================================================================
+# 信号告警规则管理 (alert_rule)
+# ============================================================================
+
+def get_alert_rules() -> pd.DataFrame:
+    """获取所有告警规则。"""
+    try:
+        return _query_df("""
+            SELECT id, name, title, description, where_clause, enabled, feishu_group,
+                   last_checked_id, created_at, updated_at
+            FROM alert_rule
+            ORDER BY id
+        """)
+    except Exception as e:
+        st.error(f"获取告警规则失败: {e}")
+        return pd.DataFrame()
+
+
+def get_alert_rule(rule_id: int) -> dict | None:
+    """获取单条告警规则。"""
+    try:
+        df = _query_df(
+            "SELECT * FROM alert_rule WHERE id = %s", (rule_id,)
+        )
+        if not df.empty:
+            return df.iloc[0].to_dict()
+        return None
+    except Exception as e:
+        st.error(f"获取告警规则失败: {e}")
+        return None
+
+
+def create_alert_rule(
+    name: str,
+    where_clause: str,
+    *,
+    title: str = "",
+    description: str = "",
+    enabled: bool = True,
+    feishu_group: str = "quant-alert",
+) -> bool:
+    """创建告警规则。"""
+    try:
+        return _execute("""
+            INSERT INTO alert_rule (name, title, description, where_clause, enabled, feishu_group)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (name, title, description, where_clause, enabled, feishu_group)) > 0
+    except Exception as e:
+        st.error(f"创建告警规则失败: {e}")
+        return False
+
+
+def update_alert_rule(
+    rule_id: int,
+    *,
+    name: str | None = None,
+    title: str | None = None,
+    description: str | None = None,
+    where_clause: str | None = None,
+    enabled: bool | None = None,
+    feishu_group: str | None = None,
+) -> bool:
+    """更新告警规则。只更新提供的字段。"""
+    fields = []
+    params: list = []
+    if name is not None:
+        fields.append("name = %s")
+        params.append(name)
+    if title is not None:
+        fields.append("title = %s")
+        params.append(title)
+    if description is not None:
+        fields.append("description = %s")
+        params.append(description)
+    if where_clause is not None:
+        fields.append("where_clause = %s")
+        params.append(where_clause)
+    if enabled is not None:
+        fields.append("enabled = %s")
+        params.append(enabled)
+    if feishu_group is not None:
+        fields.append("feishu_group = %s")
+        params.append(feishu_group)
+    if not fields:
+        return False
+    params.append(rule_id)
+    try:
+        return _execute(f"""
+            UPDATE alert_rule
+            SET {', '.join(fields)}, updated_at = NOW()
+            WHERE id = %s
+        """, params) > 0
+    except Exception as e:
+        st.error(f"更新告警规则失败: {e}")
+        return False
+
+
+def delete_alert_rule(rule_id: int) -> bool:
+    """删除告警规则。"""
+    try:
+        return _execute("DELETE FROM alert_rule WHERE id = %s", (rule_id,)) > 0
+    except Exception as e:
+        st.error(f"删除告警规则失败: {e}")
+        return False
+
+
+def toggle_alert_rule(rule_id: int) -> bool:
+    """切换告警规则的启用/禁用状态。"""
+    try:
+        return _execute("""
+            UPDATE alert_rule
+            SET enabled = NOT enabled, updated_at = NOW()
+            WHERE id = %s
+        """, (rule_id,)) > 0
+    except Exception as e:
+        st.error(f"切换告警规则状态失败: {e}")
+        return False
+
+
+def query_signals_by_rule(where_clause: str, limit: int = 50) -> pd.DataFrame:
+    """根据告警规则的 WHERE 条件查询匹配的 signal。
+
+    Args:
+        where_clause: WHERE 条件（不含 WHERE 关键字）
+        limit: 返回条数上限
+    """
+    from utils import normalize_signal_date_field
+
+    try:
+        query = f"""
+            SELECT id, pick_id, exchange, symbol, freq, symbol_name,
+                   signal_date, signal_name, side, price, score, reason,
+                   created_at
+            FROM signal
+            WHERE {where_clause}
+            ORDER BY signal_date DESC
+            LIMIT %s
+        """
+        df = _query_df(query, (limit,))
+        if not df.empty:
+            df = normalize_signal_date_field(df, 'signal_date', 'Asia/Shanghai')
+        return df
+    except Exception as e:
+        st.error(f"查询匹配信号失败: {e}")
+        return pd.DataFrame()

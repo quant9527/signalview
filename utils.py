@@ -280,6 +280,7 @@ def get_cached_data(
     start_date: str | None = None,
     end_date: str | None = None,
     signal_name_prefix: str | None = None,
+    signal_not: str | None = None,
 ) -> pd.DataFrame:
     """
     Load signals with caching. Same parameters as load_data but cached within
@@ -291,6 +292,7 @@ def get_cached_data(
         start_date=start_date,
         end_date=end_date,
         signal_name_prefix=signal_name_prefix,
+        signal_not=signal_not,
     )
 
 

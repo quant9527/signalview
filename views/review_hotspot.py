@@ -1,8 +1,7 @@
 import pandas as pd
 import streamlit as st
-from data import get_sector_constituents_from_db, create_all_signals_columns
-from signal_constants import CMP_SIGNAL_NAMES
-from utils import display_signals_multiview, get_cached_data
+from data import get_sector_constituents_from_db, create_all_signals_columns, load_data
+from utils import display_signals_multiview
 
 # ============================================================================
 # 🔥 Hotspot - 热点追踪
@@ -22,19 +21,17 @@ st.markdown("""
 
 st.divider()
 
-# 获取数据
-df = get_cached_data(45)
+# 获取 cmp 系列信号数据
+df = load_data(45, signal_name_prefix='cmp', signal_not='SELL')
 
 if df.empty:
     st.warning("暂无数据")
     st.stop()
 
+
 # ============================================================================
 # 配置区域
 # ============================================================================
-
-# 热点页使用的 CMP 系列（定义见 signal_constants.CMP_SIGNAL_NAMES）
-REBOUND_PIONEER_SIGNALS = list(CMP_SIGNAL_NAMES)
 
 # 板块交易所配置
 SECTOR_EXCHANGES = ['ths']  # 板块类型的 exchange 值
@@ -74,20 +71,17 @@ st.divider()
 # ============================================================================
 st.subheader("1️⃣ 板块反弹急先锋")
 
-st.caption(f"本段仅统计 **exchange ∈ {SECTOR_EXCHANGES}**（同花顺板块）的上述信号。")
+st.caption(f"本段仅统计 **exchange ∈ {SECTOR_EXCHANGES}**（同花顺板块）的 cmp 系列信号。")
+
+# 使用 cmp 系列信号（仅限 ths）
+ths_df = df[df["exchange"].isin(SECTOR_EXCHANGES)].copy()
+available_signals = sorted(ths_df["signal_name"].unique().tolist())
+
 st.markdown("**追踪信号：**")
-for sig in REBOUND_PIONEER_SIGNALS:
+for sig in available_signals:
     st.text(f"• {sig}")
 
-# 使用反弹急先锋相关信号（仅限 ths）
-all_pattern_signals = REBOUND_PIONEER_SIGNALS
-ths_df = df[df["exchange"].isin(SECTOR_EXCHANGES)].copy()
-available_signals = ths_df["signal_name"].unique().tolist()
-
-found_signals = [sig for sig in all_pattern_signals if sig in available_signals]
-missing_signals = [sig for sig in all_pattern_signals if sig not in available_signals]
-
-pattern_df = ths_df[ths_df["signal_name"].isin(found_signals)].copy()
+pattern_df = ths_df[ths_df["signal_name"].isin(available_signals)].copy()
 
 if pattern_df.empty:
     st.warning("未找到符合当前模式的信号数据")

@@ -36,6 +36,7 @@ pages = {
     ],
     "Tools": [
         st.Page("views/instrument_groups.py", title="Instrument Groups", icon="📁"),
+        st.Page("views/alert_rule_crud.py", title="Alert Rules", icon="🔔"),
     ],
     "ML": [
         st.Page("views/ml_scores.py", title="ML Scores", icon="🤖"),

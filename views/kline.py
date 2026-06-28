@@ -1,20 +1,25 @@
 """
-K 线：通过 Flight 拉取 OHLC + 成交量 + 均线 + MACD（同一次 do_get），Plotly 多子图；支持滚轮缩放。
+K 线：通过 Flight 拉取 OHLC + 成交量 + 均线 + MACD（同一次 do_get），
+ECharts 多标联动图表，用于走势对比。
+
+- 支持同时选择多个标的进行对比
+- ECharts 连线联动（crosshair 同步）
+- 走势对比图（归一化百分比） + 各标的分图（K 线 + 量 + MACD）
 """
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import sys
 from datetime import date, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
-import os
-
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import streamlit as st
+from streamlit.components.v1 import html as st_html
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -26,9 +31,31 @@ from constants import (
     KLINE_FREQ_OPTIONS,
     KLINE_FREQ_SET,
 )
-from data import get_instruments_by_exchange
+from symbol_picker import symbol_picker_add_ui, symbol_picker_selected_ui
 
 TZ_SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+# ECharts 深色主题配色（用于多标的走势对比线）
+ECHART_COLORS = [
+    "#f5923e",
+    "#3fb1e3",
+    "#6be6c1",
+    "#ff99cc",
+    "#9fe6b8",
+    "#ffcc66",
+    "#73c0de",
+    "#c487ff",
+    "#e68ab8",
+    "#91cc75",
+]
+
+# 均线颜色（与原来 Plotly 版一致）
+MA_COLORS = ["#ffeb3b", "#29b6f6", "#ab47bc", "#66bb6a", "#ffa726", "#ec407a"]
+
+
+# ===========================================================
+# 以下保持与原有实现兼容的辅助函数
+# ===========================================================
 
 
 def _coerce_kline_freq(raw: str | None) -> str:
@@ -58,7 +85,7 @@ def _parse_iso_date(s: str | None) -> date | None:
 
 
 def _query_params_fully_specified(qp) -> bool:
-    """symbol、freq、start、end 齐全且日期合法时视为完整，可自动拉图（无需点确定）。"""
+    """symbol 齐全（逗号分隔）、freq、start、end 齐全时自动拉图。"""
     if not _qp_get(qp, "symbol") or not _qp_get(qp, "freq"):
         return False
     if _parse_iso_date(_qp_get(qp, "start")) is None or _parse_iso_date(_qp_get(qp, "end")) is None:
@@ -73,11 +100,13 @@ def _truthy_param(s: str | None) -> bool:
 
 
 def _sync_session_from_query_params(qp, *, full: bool, default_start: date, default_end: date) -> None:
-    """full=True 时每轮用 URL 覆盖控件状态；full=False 时只覆盖 URL 里出现的键。"""
     if full:
         ex = _qp_get(qp, "exchange") or EXCHANGE_AS
         st.session_state["kline_exchange"] = ex if ex in KLINE_EXCHANGE_OPTIONS else EXCHANGE_AS
-        st.session_state["kline_symbol"] = _qp_get(qp, "symbol") or ""
+        st.session_state["kline_symbol"] = _parse_symbols_with_exchange(
+            _qp_get(qp, "symbol") or "",
+            st.session_state.get("kline_exchange", EXCHANGE_AS),
+        )
         st.session_state["kline_freq"] = _coerce_kline_freq(_qp_get(qp, "freq"))
         ds = _parse_iso_date(_qp_get(qp, "start"))
         de = _parse_iso_date(_qp_get(qp, "end"))
@@ -91,7 +120,10 @@ def _sync_session_from_query_params(qp, *, full: bool, default_start: date, defa
         if ex in KLINE_EXCHANGE_OPTIONS:
             st.session_state["kline_exchange"] = ex
     if _qp_get(qp, "symbol") is not None:
-        st.session_state["kline_symbol"] = _qp_get(qp, "symbol")
+        st.session_state["kline_symbol"] = _parse_symbols_with_exchange(
+            _qp_get(qp, "symbol") or "",
+            st.session_state.get("kline_exchange", EXCHANGE_AS),
+        )
     if _qp_get(qp, "freq") is not None:
         st.session_state["kline_freq"] = _coerce_kline_freq(_qp_get(qp, "freq"))
     if _qp_get(qp, "start") is not None:
@@ -110,7 +142,11 @@ def _ensure_kline_session_defaults(default_start: date, default_end: date) -> No
     if "kline_exchange" not in st.session_state:
         st.session_state["kline_exchange"] = EXCHANGE_AS
     if "kline_symbol" not in st.session_state:
-        st.session_state["kline_symbol"] = "600519"
+        st.session_state["kline_symbol"] = []
+    # 迁移：旧格式 list[str] → list[tuple[str, str]]（exchange, symbol）
+    elif st.session_state["kline_symbol"] and isinstance(st.session_state["kline_symbol"][0], str):
+        ex = st.session_state.get("kline_exchange", EXCHANGE_AS)
+        st.session_state["kline_symbol"] = [(ex, s) for s in st.session_state["kline_symbol"]]
     if "kline_freq" not in st.session_state or st.session_state["kline_freq"] not in KLINE_FREQ_SET:
         st.session_state["kline_freq"] = KLINE_DEFAULT_FREQ
     if "kline_start" not in st.session_state:
@@ -122,7 +158,6 @@ def _ensure_kline_session_defaults(default_start: date, default_end: date) -> No
 
 
 def _resolve_flight_url() -> str:
-    """优先 `.streamlit/secrets.toml` 的 FLIGHT_URL，否则环境变量或默认（与 `flight_kline_client.default_flight_url` 一致）。"""
     try:
         sec = st.secrets
         if "FLIGHT_URL" in sec:
@@ -160,7 +195,6 @@ def _pick_col(df: pd.DataFrame, *candidates: str) -> str | None:
 
 
 def _find_ma_columns(df: pd.DataFrame) -> list[str]:
-    """Flight 常见列名：ma5、ma_10、MA20 等。"""
     found: list[tuple[int, str]] = []
     for c in df.columns:
         lc = str(c).strip().lower()
@@ -172,10 +206,6 @@ def _find_ma_columns(df: pd.DataFrame) -> list[str]:
 
 
 def _find_macd_columns(df: pd.DataFrame) -> dict[str, str]:
-    """
-    将接口返回列映射为 dif / dea / hist，便于绑图。
-    兼容 talib 风格 macd + macdsignal + macdhist，以及 dif/dea/hist、macd_* 等命名。
-    """
     lm = {str(c).lower().strip(): c for c in df.columns}
     roles: dict[str, str] = {}
 
@@ -211,20 +241,19 @@ def _prepare_kline_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, dict] | None:
         return None
     o = _pick_col(df, "open", "Open")
     h = _pick_col(df, "high", "High")
-    l = _pick_col(df, "low", "Low")
+    lo = _pick_col(df, "low", "Low")
     c = _pick_col(df, "close", "Close")
     if c is None:
         return None
 
     out = df.copy()
     ts_raw = out[ts_col]
-    # utc=True：毫秒 epoch 与无时区字符串均按 UTC 解析为带时区时间，再转东八区墙钟（去 tz 供 Plotly）
     out["_x"] = pd.to_datetime(ts_raw, unit="ms", errors="coerce", utc=True)
     if out["_x"].isna().all():
         out["_x"] = pd.to_datetime(ts_raw, errors="coerce", utc=True)
     out["_x"] = out["_x"].dt.tz_convert(TZ_SHANGHAI).dt.tz_localize(None)
 
-    for name, col in (("open", o), ("high", h), ("low", l), ("close", c)):
+    for name, col in (("open", o), ("high", h), ("low", lo), ("close", c)):
         if col is None:
             if name == "close":
                 return None
@@ -266,361 +295,617 @@ def _prepare_kline_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, dict] | None:
     return out, meta
 
 
-def _ma_line_colors(n: int) -> list[str]:
-    palette = ["#ffeb3b", "#29b6f6", "#ab47bc", "#66bb6a", "#ffa726", "#ec407a"]
-    return [palette[i % len(palette)] for i in range(n)]
+# ===========================================================
+# ECharts 渲染函数
+# ===========================================================
 
 
-def _axis_time_formats(x) -> tuple[str, str]:
-    """刻度与悬停时间格式：纯数字，避免 Plotly 默认英文月份缩写。"""
-    ts = pd.to_datetime(pd.Series(x).dropna(), errors="coerce").dropna()
-    if ts.empty:
-        return "%Y-%m-%d", "%Y-%m-%d %H:%M:%S"
-    intraday = (
-        (ts.dt.hour != 0).any()
-        or (ts.dt.minute != 0).any()
-        or (ts.dt.second != 0).any()
-    )
-    if intraday:
-        return "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"
-    return "%Y-%m-%d", "%Y-%m-%d"
+def _normalize_pct(prices: pd.Series) -> pd.Series:
+    """归一化为基准 100 后的涨跌幅 %（以第一个非空值为基准）。"""
+    first = prices.dropna()
+    if first.empty or first.iloc[0] == 0:
+        return pd.Series(0.0, index=prices.index)
+    return (prices / first.iloc[0] - 1) * 100
 
 
-def _x_labels_category(prep_x: pd.Series) -> list[str]:
-    """
-    横轴用分类标签（与数据行一一对应），避免 datetime 连续轴在休市日仍出刻度。
-    标签为东八区墙钟按 strftime 格式化后的字符串。
-    """
-    _, fmt = _axis_time_formats(prep_x)
-    return pd.to_datetime(prep_x, errors="coerce").dt.strftime(fmt).tolist()
+def _date_labels(s: pd.Series) -> list[str]:
+    """ECharts 横轴分类标签（东八区墙钟）。"""
+    return pd.to_datetime(s).dt.strftime("%Y-%m-%d").tolist()
 
 
-def _build_figure(prep: pd.DataFrame, meta: dict) -> go.Figure:
-    has_vol = meta["has_volume"] and prep["volume"].notna().any()
-    macd_keys = meta["macd"]
-    has_macd = bool(macd_keys) and any(prep.get(k, pd.Series(dtype=float)).notna().any() for k in macd_keys.values())
+def _split_symbol_input(raw: str) -> list[str]:
+    """将逗号分隔的代码串解析为列表。"""
+    return [s.strip() for s in raw.replace("，", ",").split(",") if s.strip()]
 
-    row_heights: list[float]
-    subplot_titles: tuple[str, ...]
-    if has_vol and has_macd:
-        rows = 3
-        row_heights = [0.52, 0.18, 0.22]
-        subplot_titles = ("K 线 · 均线", "成交量", "MACD")
-    elif has_vol:
-        rows = 2
-        row_heights = [0.68, 0.28]
-        subplot_titles = ("K 线 · 均线", "成交量")
+
+def _parse_symbols_with_exchange(raw: str, default_exchange: str) -> list[tuple[str, str]]:
+    """解析逗号分隔的 symbol 列表，支持 exchange:symbol 格式。"""
+    result: list[tuple[str, str]] = []
+    for s in _split_symbol_input(raw):
+        if ":" in s:
+            ex, sym = s.split(":", 1)
+            result.append((ex if ex in KLINE_EXCHANGE_OPTIONS else default_exchange, sym))
+        else:
+            result.append((default_exchange, s))
+    return result
+
+
+def _build_comparison_option(
+    common_dates: pd.Series,
+    price_map: dict[str, pd.Series],
+) -> dict:
+    """走势对比图：归一化百分比，所有标的共用一个 x 轴。"""
+    labels = _date_labels(common_dates)
+    series: list[dict] = []
+    for i, (sym, prices) in enumerate(price_map.items()):
+        norm = _normalize_pct(prices)
+        data_vals: list[float | None] = []
+        for v in norm.tolist():
+            if pd.notna(v):
+                data_vals.append(round(v, 2))
+            else:
+                data_vals.append(None)
+        series.append(
+            {
+                "type": "line",
+                "name": sym,
+                "data": data_vals,
+                "lineStyle": {"width": 2},
+                "symbol": "none",
+                "itemStyle": {"color": ECHART_COLORS[i % len(ECHART_COLORS)]},
+            }
+        )
+
+    return {
+        "title": {
+            "text": "走势对比（归一化 %）",
+            "left": "center",
+            "textStyle": {"color": "#ccc", "fontSize": 14},
+        },
+        "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {"type": "cross"},
+        },
+        "legend": {
+            "data": list(price_map.keys()),
+            "top": 30,
+            "textStyle": {"color": "#ccc"},
+        },
+        "grid": {
+            "left": "8%",
+            "right": "8%",
+            "top": 70,
+            "bottom": 30,
+        },
+        "xAxis": {
+            "type": "category",
+            "data": labels,
+            "axisLine": {"lineStyle": {"color": "#555"}},
+            "axisLabel": {"color": "#aaa", "rotate": 45},
+        },
+        "yAxis": {
+            "type": "value",
+            "name": "涨跌幅 %",
+            "nameTextStyle": {"color": "#aaa"},
+            "axisLine": {"lineStyle": {"color": "#555"}},
+            "axisLabel": {"color": "#aaa"},
+            "splitLine": {"lineStyle": {"color": "#333"}},
+        },
+        "series": series,
+        "dataZoom": [
+            {"type": "inside"},
+            {
+                "type": "slider",
+                "height": 15,
+                "bottom": 5,
+                "borderColor": "#555",
+                "backgroundColor": "rgba(47,69,84,0)",
+                "fillerColor": "rgba(167,183,204,0.4)",
+                "labelStyle": {"color": "#aaa"},
+            },
+        ],
+        "backgroundColor": "transparent",
+    }
+
+
+def _build_symbol_candle_option(
+    symbol: str,
+    labels: list[str],
+    ohlc: list[list[float]],
+    volume: list[float | None],
+    ma_lines: list[dict[str, Any]],
+    macd: dict[str, list[float | None]] | None,
+    has_volume: bool,
+) -> dict:
+    """单个标的的 K 线 + 成交量 + MACD 三子图 ECharts option。"""
+    has_macd = macd is not None
+
+    # ---------- grids ----------
+    if has_volume and has_macd:
+        grids = [
+            {"left": "8%", "right": "8%", "top": 50, "height": "40%"},
+            {"left": "8%", "right": "8%", "top": "51%", "height": "15%"},
+            {"left": "8%", "right": "8%", "top": "68%", "bottom": 28},
+        ]
+    elif has_volume:
+        grids = [
+            {"left": "8%", "right": "8%", "top": 50, "height": "48%"},
+            {"left": "8%", "right": "8%", "top": "60%", "bottom": 28},
+        ]
     elif has_macd:
-        rows = 2
-        row_heights = [0.68, 0.28]
-        subplot_titles = ("K 线 · 均线", "MACD")
+        grids = [
+            {"left": "8%", "right": "8%", "top": 50, "height": "48%"},
+            {"left": "8%", "right": "8%", "top": "60%", "bottom": 28},
+        ]
     else:
-        rows = 1
-        row_heights = [1.0]
-        subplot_titles = ("K 线 · 均线",)
+        grids = [{"left": "8%", "right": "8%", "top": 50, "bottom": 28}]
 
-    fig = make_subplots(
-        rows=rows,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.06 if rows > 1 else 0,
-        row_heights=row_heights,
-        subplot_titles=subplot_titles,
+    n_grids = len(grids)
+
+    # ---------- xAxes ----------
+    x_axes: list[dict] = []
+    for i in range(n_grids):
+        x_axes.append(
+            {
+                "type": "category",
+                "data": labels,
+                "gridIndex": i,
+                "axisLabel": {
+                    "show": i == n_grids - 1,
+                    "color": "#aaa",
+                    "rotate": 45,
+                },
+                "axisLine": {"lineStyle": {"color": "#555"}},
+                "axisTick": {"alignWithLabel": True},
+            }
+        )
+
+    # ---------- yAxes ----------
+    y_axes: list[dict] = []
+    for i in range(n_grids):
+        y_axes.append(
+            {
+                "type": "value",
+                "gridIndex": i,
+                "scale": i == 0,
+                "axisLine": {"lineStyle": {"color": "#555"}},
+                "axisLabel": {"color": "#aaa"},
+                "splitLine": {"lineStyle": {"color": "#333"}},
+            }
+        )
+    y_axes[0]["name"] = "价格"
+    y_axes[0]["nameTextStyle"] = {"color": "#aaa"}
+    if has_volume:
+        y_axes[1]["name"] = "量"
+        y_axes[1]["nameTextStyle"] = {"color": "#aaa"}
+    if has_macd:
+        mi = 2 if has_volume else 1
+        y_axes[mi]["name"] = "MACD"
+        y_axes[mi]["nameTextStyle"] = {"color": "#aaa"}
+
+    # ---------- series ----------
+    series: list[dict] = []
+
+    # Candlestick
+    series.append(
+        {
+            "type": "candlestick",
+            "name": symbol,
+            "data": ohlc,
+            "xAxisIndex": 0,
+            "yAxisIndex": 0,
+            "itemStyle": {
+                "color": "#26a69a",
+                "color0": "#ef5350",
+                "borderColor": "#26a69a",
+                "borderColor0": "#ef5350",
+            },
+        }
     )
 
-    x_dt = prep["_x"]
-    x_labels = _x_labels_category(x_dt)
-    candle_hover = (
-        "时间: %{x}<br>开盘: %{open:.4f}<br>最高: %{high:.4f}<br>最低: %{low:.4f}<br>收盘: %{close:.4f}<extra></extra>"
-    )
+    # MA lines
+    for ma in ma_lines:
+        series.append(
+            {
+                "type": "line",
+                "name": ma["name"],
+                "data": ma["data"],
+                "xAxisIndex": 0,
+                "yAxisIndex": 0,
+                "symbol": "none",
+                "lineStyle": {"width": 1.2, "color": ma["color"]},
+            }
+        )
 
-    fig.add_trace(
-        go.Candlestick(
-            x=x_labels,
-            open=prep["open"],
-            high=prep["high"],
-            low=prep["low"],
-            close=prep["close"],
-            name="K线",
-            increasing_line_color="#ef5350",
-            decreasing_line_color="#26a69a",
-            hovertemplate=candle_hover,
-        ),
-        row=1,
-        col=1,
-    )
+    # Volume
+    if has_volume:
+        vol_idx = 1 if has_macd else 1
+        bar_data: list[dict] = []
+        for i in range(len(ohlc)):
+            v = volume[i]
+            if v is None:
+                bar_data.append({"value": None, "itemStyle": {"color": "#555"}})
+            else:
+                up = ohlc[i][0] <= ohlc[i][1]  # open <= close 为涨
+                bar_data.append(
+                    {
+                        "value": v,
+                        "itemStyle": {"color": "#26a69a" if up else "#ef5350"},
+                    }
+                )
+        series.append(
+            {
+                "type": "bar",
+                "name": "成交量",
+                "data": bar_data,
+                "xAxisIndex": vol_idx,
+                "yAxisIndex": vol_idx,
+            }
+        )
 
-    ma_cols: list[str] = meta["ma_cols"]
-    colors = _ma_line_colors(len(ma_cols))
+    # MACD
+    if has_macd and macd is not None:
+        mi = 2 if has_volume else 1
+        hist = macd.get("hist", [])
+        dif = macd.get("dif", [])
+        dea = macd.get("dea", [])
+        # 带涨跌配色的 MACD 柱（正值绿、负值红）
+        macd_bar_data: list[dict] = []
+        for v in hist:
+            if v is None:
+                macd_bar_data.append({"value": None, "itemStyle": {"color": "#555"}})
+            else:
+                macd_bar_data.append({
+                    "value": v,
+                    "itemStyle": {"color": "#26a69a" if v >= 0 else "#ef5350"},
+                })
+        series.append(
+            {
+                "type": "bar",
+                "name": "MACD",
+                "data": macd_bar_data,
+                "xAxisIndex": mi,
+                "yAxisIndex": mi,
+            }
+        )
+        series.append(
+            {
+                "type": "line",
+                "name": "DIF",
+                "data": dif,
+                "xAxisIndex": mi,
+                "yAxisIndex": mi,
+                "symbol": "none",
+                "lineStyle": {"width": 1.5, "color": "#ffeb3b"},
+            }
+        )
+        series.append(
+            {
+                "type": "line",
+                "name": "DEA",
+                "data": dea,
+                "xAxisIndex": mi,
+                "yAxisIndex": mi,
+                "symbol": "none",
+                "lineStyle": {"width": 1.5, "color": "#29b6f6"},
+            }
+        )
+
+    legend_names = [symbol] + [m["name"] for m in ma_lines]
+    n_grids = len(grids)
+    data_zoom = [
+        {"type": "inside", "xAxisIndex": list(range(n_grids))},
+        {
+            "type": "slider",
+            "xAxisIndex": list(range(n_grids)),
+            "height": 15,
+            "bottom": 5,
+            "borderColor": "#555",
+            "backgroundColor": "rgba(47,69,84,0)",
+            "fillerColor": "rgba(167,183,204,0.4)",
+            "labelStyle": {"color": "#aaa"},
+        },
+    ]
+
+    return {
+        "title": {
+            "text": symbol,
+            "left": "left",
+            "textStyle": {"color": "#fff", "fontSize": 14},
+        },
+        "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {"type": "cross"},
+        },
+        "legend": {
+            "data": legend_names,
+            "top": 5,
+            "right": 20,
+            "textStyle": {"color": "#ccc"},
+            "selected": {symbol: True},
+        },
+        "grid": grids,
+        "xAxis": x_axes,
+        "yAxis": y_axes,
+        "series": series,
+        "dataZoom": data_zoom,
+        "backgroundColor": "transparent",
+    }
+
+
+def _build_echarts_html(chart_configs: list[dict]) -> str:
+    """渲染多个 ECharts 实例的 HTML，charts 之间 connect 实现联动。"""
+    divs: list[str] = []
+    inits: list[str] = []
+    opts: list[str] = []
+
+    for cfg in chart_configs:
+        cid = cfg["id"]
+        h = cfg["height"]
+        divs.append(
+            f'<div id="{cid}" style="width:100%;height:{h}px;margin-bottom:6px;"></div>'
+        )
+        inits.append(f'ch["{cid}"]=echarts.init(document.getElementById("{cid}"),"dark");')
+        opts.append(f'ch["{cid}"].setOption({json.dumps(cfg["option"], ensure_ascii=False)});')
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>*{{margin:0;padding:0;box-sizing:border-box;}}body{{background:#0e1117;padding:6px;}}</style>
+</head><body>
+{"".join(divs)}
+<script>
+(function(){{var ch={{}};
+{"".join(inits)}
+var lst=Object.values(ch);
+lst.forEach(function(c){{if(c)c.group='kl';}});
+if(lst.length)echarts.connect('kl');
+{"".join(opts)}
+var syncZoom=function(params){{var p=params.batch?params.batch[0]:params;if(p.start==null||p.end==null)return;var src=this;lst.forEach(function(c){{if(c&&c!==src){{c.dispatchAction({{type:'dataZoom',start:p.start,end:p.end}});}}}});}};
+lst.forEach(function(c){{if(c)c.on('dataZoom',syncZoom);}});
+window.addEventListener("resize",function(){{lst.forEach(function(c){{if(c)c.resize();}});}});
+}})();
+</script></body></html>"""
+    return html
+
+
+# ===========================================================
+# 数据提取与转换
+# ===========================================================
+
+
+def _extract_symbol_data(
+    df: pd.DataFrame,
+    sym_key: str,
+) -> tuple[pd.DataFrame, dict] | None:
+    """从混表中按 symbol 过滤并解析 K 线。"""
+    raw = df.copy()
+    if "symbol" in raw.columns:
+        raw = raw[raw["symbol"].astype(str).str.lower() == sym_key.lower()]
+    if raw.empty:
+        return None
+    return _prepare_kline_frame(raw)
+
+
+def _to_echarts_ohlc(prep: pd.DataFrame) -> list[list[float]]:
+    """ECharts candlestick 数据，[open, close, low, high] 格式。"""
+    rows: list[list[float]] = []
+    for _, r in prep.iterrows():
+        rows.append([float(r["open"]), float(r["close"]), float(r["low"]), float(r["high"])])
+    return rows
+
+
+def _to_echarts_volume(prep: pd.DataFrame) -> list[float | None]:
+    if "volume" not in prep.columns:
+        return []
+    return [
+        None if pd.isna(v) else float(v)
+        for v in prep["volume"]
+    ]
+
+
+def _to_echarts_ma(prep: pd.DataFrame, ma_cols: list[str]) -> list[dict[str, Any]]:
+    lines: list[dict] = []
     for i, lc in enumerate(ma_cols):
         if lc not in prep.columns:
             continue
         s = prep[lc]
         if s.notna().sum() == 0:
             continue
-        fig.add_trace(
-            go.Scatter(
-                x=x_labels,
-                y=s,
-                mode="lines",
-                name=lc.upper(),
-                line=dict(width=1.2, color=colors[i]),
-                legendgroup="ma",
-            ),
-            row=1,
-            col=1,
+        lines.append(
+            {
+                "name": lc.upper(),
+                "data": [None if pd.isna(v) else round(float(v), 4) for v in s],
+                "color": MA_COLORS[i % len(MA_COLORS)],
+            }
         )
+    return lines
 
-    row_vol = 2 if has_vol else None
-    row_macd = rows if has_macd else None
-    if has_vol and has_macd:
-        row_macd = 3
-    elif has_macd and not has_vol:
-        row_macd = 2
 
-    if has_vol and row_vol is not None:
-        vol = prep["volume"].fillna(0)
-        bar_colors = [
-            "#ef5350" if prep["close"].iloc[i] < prep["open"].iloc[i] else "#26a69a"
-            for i in range(len(prep))
-        ]
-        fig.add_trace(
-            go.Bar(x=x_labels, y=vol, name="成交量", marker_color=bar_colors, showlegend=False),
-            row=row_vol,
-            col=1,
-        )
+def _to_echarts_macd(prep: pd.DataFrame, macd_keys: dict[str, str]) -> dict[str, list[float | None]] | None:
+    if not macd_keys:
+        return None
+    out: dict[str, list[float | None]] = {}
+    for role, col in macd_keys.items():
+        if col not in prep.columns:
+            out[role] = []
+        else:
+            out[role] = [None if pd.isna(v) else round(float(v), 6) for v in prep[col]]
+    return out
 
-    if has_macd and row_macd is not None:
-        hist_k = macd_keys.get("hist")
-        if hist_k and prep[hist_k].notna().any():
-            hist_vals = prep[hist_k]
-            hist_colors = ["#ef5350" if v < 0 else "#26a69a" for v in hist_vals.fillna(0)]
-            fig.add_trace(
-                go.Bar(x=x_labels, y=hist_vals, name="MACD柱", marker_color=hist_colors, showlegend=True),
-                row=row_macd,
-                col=1,
-            )
-        dif_k = macd_keys.get("dif")
-        if dif_k and prep[dif_k].notna().any():
-            fig.add_trace(
-                go.Scatter(x=x_labels, y=prep[dif_k], mode="lines", name="DIF", line=dict(width=1.5, color="#ffeb3b")),
-                row=row_macd,
-                col=1,
-            )
-        dea_k = macd_keys.get("dea")
-        if dea_k and prep[dea_k].notna().any():
-            fig.add_trace(
-                go.Scatter(x=x_labels, y=prep[dea_k], mode="lines", name="DEA", line=dict(width=1.5, color="#29b6f6")),
-                row=row_macd,
-                col=1,
-            )
 
-    fig.update_layout(
-        template="plotly_dark",
-        xaxis_rangeslider_visible=False,
-        dragmode="zoom",
-        hovermode="x unified",
-        height=280 + rows * 260,
-        margin=dict(l=52, r=28, t=48, b=40),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    fig.update_yaxes(title_text="价格", row=1, col=1)
-    if has_vol and row_vol is not None:
-        fig.update_yaxes(title_text="量", row=row_vol, col=1)
-    if has_macd and row_macd is not None:
-        fig.update_yaxes(title_text="MACD", row=row_macd, col=1)
+# ===========================================================
+# 页面入口
+# ===========================================================
 
-    last_row = rows
-    for ri in range(1, last_row):
-        fig.update_xaxes(showticklabels=False, row=ri, col=1)
-    fig.update_xaxes(title_text="时间", row=last_row, col=1)
 
-    for ri in range(1, rows + 1):
-        fig.update_xaxes(showspikes=True, spikemode="across", spikesnap="cursor", row=ri, col=1)
-        fig.update_yaxes(showspikes=True, spikemode="across", spikesnap="cursor", row=ri, col=1)
-
-    # 分类横轴：仅出现数据里有的时点，休市日不会占刻度（与连续 datetime 轴不同）
-    nlab = len(x_labels)
-    fig.update_xaxes(
-        type="category",
-        tickangle=-45 if nlab > 24 else -25 if nlab > 12 else 0,
+def main() -> None:
+    st.header("🕯️ K 线 · 多标对比")
+    st.caption(
+        "数据来自 Flight（同一次拉取）：OHLC、**成交量**、**ma5/ma10/…** 均线、**MACD**。"
+        "支持同时选择多个标的进行对比，ECharts 连线联动，hover 任一图表时其他图表同步显示 crosshair。"
+        "服务地址在 `.streamlit/secrets.toml` 配置 `FLIGHT_URL`（或环境变量 `FLIGHT_URL`）。"
+        "图表时间均为**东八区**墙钟。"
     )
 
-    return fig
+    default_end = date.today()
+    default_start = default_end - timedelta(days=365)
 
+    qp = st.query_params
+    url_complete = _query_params_fully_specified(qp)
+    _ensure_kline_session_defaults(default_start, default_end)
+    _sync_session_from_query_params(qp, full=url_complete, default_start=default_start, default_end=default_end)
 
-st.header("🕯️ K 线")
-st.caption(
-    "数据来自 Flight（同一次拉取）：OHLC、**成交量**、**ma5/ma10/…** 均线、**MACD**。"
-    "服务地址在 `.streamlit/secrets.toml` 配置 `FLIGHT_URL`（或环境变量 `FLIGHT_URL`）。"
-    "图表时间为**东八区**（Asia/Shanghai）墙钟；`pd.to_datetime(..., utc=True)` 按 **UTC** 解析后再转换。"
-    "横轴为**分类轴**，只显示接口返回的有 K 线的时点，休市日不会出现空档刻度。"
-    "完整查询参数示例：`?symbol=600519&exchange=as&freq=1d&start=2024-01-01&end=2025-01-01`（`exchange` 可为 `as` / `ths` / `asindex` / `hyperliquid`；可选 `reverse=1`），"
-    "带齐 **symbol、freq、start、end** 时自动拉图；否则点「确定」。"
-)
+    # ---------- 已选标的（可删除） ----------
+    remove_idx = symbol_picker_selected_ui(st.session_state["kline_symbol"])
+    if remove_idx is not None:
+        st.session_state["kline_symbol"].pop(remove_idx)
+        st.rerun()
 
-default_end = date.today()
-default_start = default_end - timedelta(days=365)
+    # ---------- 添加标的 ----------
+    st.markdown("**添加标的**")
+    result = symbol_picker_add_ui()
+    if result is not None:
+        ex, sym = result
+        pair = (ex, sym)
+        if pair not in st.session_state["kline_symbol"]:
+            st.session_state["kline_symbol"].append(pair)
+        st.rerun()
 
-qp = st.query_params
-url_complete = _query_params_fully_specified(qp)
-_ensure_kline_session_defaults(default_start, default_end)
-_sync_session_from_query_params(qp, full=url_complete, default_start=default_start, default_end=default_end)
-
-c1, c2 = st.columns(2)
-with c1:
-    exchange = st.selectbox(
-        "交易所 / 类型",
-        options=list(KLINE_EXCHANGE_OPTIONS),
-        key="kline_exchange",
+    kline_freq = st.radio(
+        "K 线周期",
+        options=list(KLINE_FREQ_OPTIONS),
+        key="kline_freq",
+        horizontal=True,
     )
-with c2:
-    instruments_df = get_instruments_by_exchange(exchange)
-    if not instruments_df.empty:
-        symbol_to_label = {
-            row["symbol"]: f"{row['symbol']} - {row['name']}"
-            for _, row in instruments_df.iterrows()
-        }
-        sym_options = sorted(symbol_to_label.keys())
-        st.selectbox(
-            "代码",
-            options=sym_options,
-            format_func=lambda s: symbol_to_label.get(s, s),
-            key="kline_symbol",
+
+    c4, c5 = st.columns(2)
+    with c4:
+        start_d = st.date_input("开始日期", key="kline_start")
+    with c5:
+        end_d = st.date_input("结束日期", key="kline_end")
+
+    kline_reverse = st.checkbox("kline_reverse（倒序返回）", key="kline_reverse")
+
+    submitted = st.button("确定", type="primary")
+    run_fetch = url_complete or submitted
+
+    if not run_fetch:
+        st.info("选择标的、周期、日期范围后点击「确定」加载 K 线对比图。")
+        st.stop()
+
+    if not st.session_state["kline_symbol"]:
+        st.error("请至少选择一个标的代码。")
+        st.stop()
+
+    if start_d > end_d:
+        st.error("开始日期不能晚于结束日期。")
+        st.stop()
+
+    # ---------- 构建 tags 并拉取 ----------
+    tags: list[str] = []
+    sym_keys: list[str] = []
+    for sym_exchange, sym_symbol in st.session_state["kline_symbol"]:
+        t = fkc.build_kline_tags([sym_symbol], sym_exchange, kline_freq)
+        if not t:
+            st.error(f"代码「{sym_exchange}:{sym_symbol}」无效，请检查。")
+            st.stop()
+        tags.extend(t)
+        sk = _symbol_key_from_tags(t)
+        if sk:
+            sym_keys.append(sk)
+
+    if not sym_keys:
+        st.error("无法解析标的标识。")
+        st.stop()
+
+    start_ms = int(pd.Timestamp(start_d).timestamp() * 1000)
+    end_ms = int(pd.Timestamp(end_d).replace(hour=23, minute=59, second=59).timestamp() * 1000)
+    flight_url = _resolve_flight_url()
+
+    with st.spinner("正在从 Flight 拉取 K 线…"):
+        raw = fkc.fetch_kline_dataframe(
+            tags,
+            start_ms,
+            end_ms,
+            flight_url=flight_url or None,
+            kline_reverse=kline_reverse,
         )
+
+    if raw is None:
+        st.error("拉取失败：请确认 Flight 服务已启动，且已安装 `pyarrow`。")
+        st.stop()
+
+    if raw.empty:
+        st.warning("该时间范围内无数据。")
+        st.stop()
+
+    # ---------- 按 symbol 过滤并解析 ----------
+
+    sym_data: dict[str, tuple[pd.DataFrame, dict]] = {}
+    for sk in sym_keys:
+        parsed = _extract_symbol_data(raw, sk)
+        if parsed is not None:
+            sym_data[sk] = parsed
+
+    if not sym_data:
+        st.warning("未找到与请求匹配的标的行。")
+        st.stop()
+
+    found_syms = list(sym_data.keys())
+    st.caption(f"已获取 {len(found_syms)} 个标的：{'、'.join(found_syms)}")
+
+    # ---------- 走势对比图 + 各标的详细图 (合并到一个 HTML/iframe) ----------
+    all_charts: list[dict] = []
+
+    if len(found_syms) > 1:
+        common_dates: pd.Series | None = None
+        price_map: dict[str, pd.Series] = {}
+        for sk, (prep, _) in sym_data.items():
+            dates = prep["_x"]
+            if common_dates is None:
+                common_dates = dates
+            else:
+                common_dates = pd.Series(sorted(set(common_dates) & set(dates)))
+        if common_dates is not None and not common_dates.empty:
+            for sk, (prep, _) in sym_data.items():
+                aligned = prep.set_index("_x").reindex(common_dates)["close"]
+                price_map[sk] = aligned
+
+            cmp_option = _build_comparison_option(common_dates, price_map)
+            all_charts.append({"id": "cmp", "height": 360, "option": cmp_option})
+
+    for sk, (prep, meta) in sym_data.items():
+        labels = _date_labels(prep["_x"])
+        ohlc = _to_echarts_ohlc(prep)
+        vol = _to_echarts_volume(prep)
+        ma_lines = _to_echarts_ma(prep, meta["ma_cols"])
+        macd = _to_echarts_macd(prep, meta["macd"])
+        has_vol = meta["has_volume"] and prep["volume"].notna().any()
+
+        opt = _build_symbol_candle_option(
+            symbol=sk,
+            labels=labels,
+            ohlc=ohlc,
+            volume=vol,
+            ma_lines=ma_lines,
+            macd=macd,
+            has_volume=has_vol,
+        )
+        all_charts.append({"id": f"ch_{sk}", "height": 520, "option": opt})
+
+    if all_charts:
+        full_html = _build_echarts_html(all_charts)
+        total_h = sum(c["height"] for c in all_charts) + len(all_charts) * 8 + 10
+        st_html(full_html, height=total_h)
     else:
-        placeholder = (
-            "600519 或 sh000300"
-            if exchange != "hyperliquid" else
-            "BTC、ETH、BTC-USDT"
-        )
-        st.text_input("代码", key="kline_symbol", placeholder=placeholder)
+        st.warning("所选标的无共同交易日，无法绘制对比图。")
 
-kline_freq = st.radio(
-    "K 线周期",
-    options=list(KLINE_FREQ_OPTIONS),
-    key="kline_freq",
-    horizontal=True,
-    help="与 Flight tag 一致，对应 URL 参数 `freq`。不在列表中的 `freq` 会回落为 1d。",
-)
+    # ---------- 摘要 ----------
+    bits = [f"共 {len(found_syms)} 个标的"]
+    total_bars = sum(len(prep) for prep, _ in sym_data.values())
+    bits.append(f"总计 {total_bars} 根 K 线")
+    st.caption(" · ".join(bits) + " · 图表已通过 ECharts connect 联动，hover 任一图表时其它图表同步 crosshair。")
 
 
-c4, c5 = st.columns(2)
-with c4:
-    start_d = st.date_input("开始日期", key="kline_start")
-with c5:
-    end_d = st.date_input("结束日期", key="kline_end")
-
-kline_reverse = st.checkbox(
-    "kline_reverse（倒序返回）",
-    key="kline_reverse",
-    help="Flight 请求体 kline_reverse：服务端是否按时间倒序返回 K 线。",
-)
-
-submitted = st.button("确定", type="primary")
-run_fetch = url_complete or submitted
-
-if not run_fetch:
-    st.info("填写参数后点击「确定」加载 K 线；或在 URL 中提供 **symbol、freq、start、end** 自动加载。")
-    st.stop()
-
-symbol = str(st.session_state.get("kline_symbol", "")).strip()
-if not symbol:
-    st.error("请输入代码。")
-    st.stop()
-
-if start_d > end_d:
-    st.error("开始日期不能晚于结束日期。")
-    st.stop()
-
-start_ms = int(pd.Timestamp(start_d).timestamp() * 1000)
-end_ms = int(pd.Timestamp(end_d).replace(hour=23, minute=59, second=59).timestamp() * 1000)
-
-tags = fkc.build_kline_tags([symbol], exchange, kline_freq)
-if not tags:
-    hint = (
-        "个股请填 6 位数字；指数请用 sh/sz + 6 位，如 sh000300"
-        if exchange != "hyperliquid" else
-        "Hyperliquid 请填交易对，如 BTC、ETH、BTC-USDT"
-    )
-    st.error(f"代码无效：{hint}。")
-    st.stop()
-
-st.caption(f"tags = {tags!r}")
-
-sym_key = _symbol_key_from_tags(tags)
-if not sym_key:
-    st.error("无法解析标的标识，请检查代码与交易所类型。")
-    st.stop()
-
-flight_url = _resolve_flight_url()
-
-with st.spinner("正在从 Flight 拉取 K 线…"):
-    raw = fkc.fetch_kline_dataframe(
-        tags,
-        start_ms,
-        end_ms,
-        flight_url=flight_url or None,
-        kline_reverse=kline_reverse,
-    )
-
-if raw is None:
-    st.error(
-        "拉取失败：请确认 Flight 服务已启动，且已安装 `pyarrow`。"
-        "地址来自 `.streamlit/secrets.toml` 的 `FLIGHT_URL`（或 `[flight] url`），"
-        "未配置时使用环境变量 `FLIGHT_URL`（默认 grpc://127.0.0.1:50001）。"
-    )
-    st.stop()
-
-if raw.empty:
-    st.warning("该时间范围内无数据。")
-    st.stop()
-
-ex_l = str(exchange).strip().lower()
-if "exchange" in raw.columns:
-    sub = raw[raw["exchange"].astype(str).str.lower() == ex_l].copy()
-else:
-    sub = raw.copy()
-if "symbol" in sub.columns:
-    sub = sub[sub["symbol"].astype(str).str.lower() == sym_key].copy()
-if sub.empty:
-    st.warning("未找到与请求匹配的标的行（请核对 exchange 与代码）。")
-    st.stop()
-
-prepared = _prepare_kline_frame(sub)
-if prepared is None:
-    st.warning("无法从返回表中解析时间或价格列。")
-    st.stop()
-
-prep, meta = prepared
-if prep.empty:
-    st.warning("该时间范围内无有效 K 线。")
-    st.stop()
-
-fig = _build_figure(prep, meta)
-st.plotly_chart(
-    fig,
-    use_container_width=True,
-    config={
-        "scrollZoom": True,
-        "displayModeBar": True,
-        "modeBarButtonsToRemove": ["lasso2d", "select2d"],
-    },
-)
-
-bits = [f"共 {len(prep)} 根 K 线"]
-if meta["has_volume"]:
-    bits.append("成交量")
-if meta["ma_cols"]:
-    bits.append("均线 " + ",".join(meta["ma_cols"]))
-if meta["macd"]:
-    bits.append("MACD")
-st.caption(
-    " · ".join(bits)
-    + " · 在图上**悬停并滚轮**可缩放；多子图**共享横轴**。"
-)
-
-if not meta["has_volume"] and not meta["ma_cols"] and not meta["macd"]:
-    st.warning(
-        "当前返回表未识别到 volume、ma* 或 MACD 列。若接口字段名不同，可在 `views/kline.py` 的 `_find_ma_columns` / `_find_macd_columns` 中补充别名。"
-    )
+main()

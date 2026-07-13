@@ -50,6 +50,7 @@ with col_left:
                     column_config={
                         "exchange": st.column_config.TextColumn("交易所", width="small"),
                         "symbol": st.column_config.TextColumn("代码", width="small"),
+                        "reverse": st.column_config.CheckboxColumn("reverse", width="small"),
                         "instrument_name": st.column_config.TextColumn("名称", width="medium"),
                         "created_at": st.column_config.DatetimeColumn("添加时间", width="medium"),
                     },
@@ -76,6 +77,11 @@ with col_left:
                         st.rerun()
 
         with tab_add:
+            reverse_flag = st.checkbox(
+                "作为 reverse 标的添加",
+                key=f"reverse_flag_{selected_group}",
+                help="勾选后，添加到该分组的成员会标记为 reverse。",
+            )
             selected = instrument_search_picker(key_prefix=f"ig_{selected_group}")
             if not selected.empty:
                 if st.button(
@@ -85,7 +91,7 @@ with col_left:
                     added_count = 0
                     for _, row in selected.iterrows():
                         if add_instrument_group_member(
-                            selected_group, row["exchange"], row["symbol"]
+                            selected_group, row["exchange"], row["symbol"], reverse=reverse_flag
                         ):
                             added_count += 1
                     st.success(f"已添加 {added_count} 个标的")

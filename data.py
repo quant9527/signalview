@@ -561,14 +561,20 @@ def get_instrument_group_members(group_name: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def add_instrument_group_member(group_name: str, exchange: str, symbol: str) -> bool:
+def add_instrument_group_member(
+    group_name: str,
+    exchange: str,
+    symbol: str,
+    reverse: bool = False,
+) -> bool:
     """向分组添加成员。"""
     try:
         return _execute(
-            """INSERT INTO instrument_group_member (group_name, exchange, symbol)
-               VALUES (%s, %s, %s)
-               ON CONFLICT (group_name, exchange, symbol) DO NOTHING""",
-            (group_name, exchange, symbol)
+            """INSERT INTO instrument_group_member (group_name, exchange, symbol, reverse)
+               VALUES (%s, %s, %s, %s)
+               ON CONFLICT (group_name, exchange, symbol)
+               DO UPDATE SET reverse = EXCLUDED.reverse""",
+            (group_name, exchange, symbol, reverse)
         ) > 0
     except Exception as e:
         st.error(f"Failed to add group member: {e}")
@@ -585,6 +591,26 @@ def remove_instrument_group_member(group_name: str, exchange: str, symbol: str) 
     except Exception as e:
         st.error(f"Failed to remove group member: {e}")
         return False
+
+
+def get_kline_signals(exchange: str, symbol: str, start_date, end_date) -> pd.DataFrame:
+    """获取 K 线图上展示的多空信号（轻量，只取必要字段）。"""
+    from utils import normalize_signal_date_field
+    try:
+        df = _query_df("""
+            SELECT signal_date, signal_name, side, signal, freq, price, reason
+            FROM signal
+            WHERE exchange = %s AND symbol = %s
+              AND signal_date >= %s AND signal_date < (%s::date + interval '1 day')
+              AND side IS NOT NULL
+            ORDER BY signal_date
+        """, (exchange, symbol, start_date, end_date))
+        if not df.empty:
+            df = normalize_signal_date_field(df, 'signal_date', 'Asia/Shanghai')
+        return df
+    except Exception as e:
+        print(f"[kline_signals] {e}")
+        return pd.DataFrame()
 
 
 def search_instruments(query: str, limit: int = 50) -> pd.DataFrame:
@@ -608,10 +634,10 @@ def search_instruments(query: str, limit: int = 50) -> pd.DataFrame:
 
 
 def get_instruments_by_exchange(exchange: str) -> pd.DataFrame:
-    """按交易所获取所有 instrument。"""
+    """按交易所获取所有 instrument（含 alias，用于拼音搜索）。"""
     try:
         return _query_df("""
-            SELECT exchange, symbol, name, sub_exchange
+            SELECT exchange, symbol, name, sub_exchange, alias
             FROM instrument
             WHERE exchange = %s
             ORDER BY symbol

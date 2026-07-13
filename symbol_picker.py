@@ -22,17 +22,13 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
     """
     Render exchange selector + searchable symbol dropdown + add button.
 
-    当有 instruments 数据时显示可搜索的下拉框（代码 + 名称），否则回退为文本输入框。
+    下拉选项包含「代码  名称  [别名]」，alias 中包含拼音首字母，
+    Streamlit 自带搜索可直接匹配（如输入"jfy"找到"减肥药"）。
 
     Returns
     -------
     (exchange, symbol) | None
         点「＋ 添加」时返回 (exchange, symbol)，否则返回 None。
-
-    内部使用 st.session_state 管理以下 key（受 key_prefix 隔离）：
-        {key_prefix}_exchange      — 当前选择的交易所
-        {key_prefix}_symbol_select — 有 instrument 时的下拉值
-        {key_prefix}_symbol_input  — 无 instrument 时的文本输入
     """
     a_exchange: str = st.selectbox(
         "交易所",
@@ -46,10 +42,29 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
         name_map: dict[str, Any] = dict(
             zip(add_inst["symbol"], add_inst["name"], strict=False)
         )
+        # alias_map: symbol -> extra identifiers (pinyin initials, etc.)
+        if "alias" in add_inst.columns:
+            alias_map: dict[str, str] = {}
+            for _, row in add_inst.iterrows():
+                aliases = row.get("alias")
+                if isinstance(aliases, (list, tuple)):
+                    sym_low = str(row["symbol"]).lower()
+                    nam_low = str(row.get("name", "")).lower()
+                    extra = [str(a) for a in aliases
+                             if str(a).lower() not in (sym_low, nam_low)]
+                    if extra:
+                        alias_map[row["symbol"]] = "_".join(extra)
+        else:
+            alias_map = {}
+
         a_symbol: str = st.selectbox(
             "代码",
             options=sym_list,
-            format_func=lambda s: f"{s}  {name_map.get(s, '')}",
+            format_func=lambda s: (
+                f"{s}"
+                + (f"_{name_map.get(s, '')}" if name_map.get(s, "") else "")
+                + (f"_{alias_map.get(s, '')}" if alias_map.get(s) else "")
+            ),
             key=f"{key_prefix}_symbol_select",
         )
     else:
@@ -71,7 +86,7 @@ def symbol_picker_selected_ui(
     key_prefix: str = "sp",
 ) -> int | None:
     """
-    已选标的：行内标签展示 + 紧凑删除按钮。
+    已选标的：使用 multiselect tag 展示，点击 × 即可删除。
 
     Parameters
     ----------
@@ -83,21 +98,29 @@ def symbol_picker_selected_ui(
     Returns
     -------
     int | None
-        用户点击了哪个 index 的 ✕ 按钮，否则 None。
+        用户删除了哪个 index 的项，否则 None。
     """
     if not selected:
         return None
 
-    # 一行内展示所有已选标签
-    tag_str = "  ".join(f"**{ex}**`{sym}`" for ex, sym in selected)
-    st.markdown(f"**已选标的：** {tag_str}")
+    st.markdown(f"**已选标的（{len(selected)}）**  ·  点击标签右侧 `×` 删除")
+    options = [f"{ex}:{sym}" for ex, sym in selected]
+    source_key = f"{key_prefix}_selected_source"
+    state_key = f"{key_prefix}_selected_tags"
+    prev_source = st.session_state.get(source_key)
+    if prev_source != options:
+        st.session_state[source_key] = list(options)
+        st.session_state[state_key] = list(options)
 
-    # 紧凑删除按钮（最多 4 列，换行排列）
-    remove_idx: int | None = None
-    n = min(4, len(selected))
-    cols = st.columns(n)
-    for i, (ex, sym) in enumerate(selected):
-        with cols[i % n]:
-            if st.button(f"✕ {ex}:{sym}", key=f"{key_prefix}_rm_{ex}_{sym}", use_container_width=True):
-                remove_idx = i
-    return remove_idx
+    curr_selected: list[str] = st.multiselect(
+        "已选标的",
+        options=options,
+        key=state_key,
+        label_visibility="collapsed",
+        placeholder="点击标签右侧 × 删除",
+    )
+    removed = [x for x in options if x not in curr_selected]
+    if removed:
+        return options.index(removed[0])
+
+    return None

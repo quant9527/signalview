@@ -416,9 +416,11 @@ def _build_symbol_candle_option(
     ma_lines: list[dict[str, Any]],
     macd: dict[str, list[float | None]] | None,
     has_volume: bool,
+    signal_scatter: list[dict] | None = None,
 ) -> dict:
     """单个标的的 K 线 + 成交量 + MACD 三子图 ECharts option。"""
     has_macd = macd is not None
+    macd_latest_text = ""
 
     # ---------- grids ----------
     if has_volume and has_macd:
@@ -590,8 +592,43 @@ def _build_symbol_candle_option(
                 "lineStyle": {"width": 1.5, "color": "#29b6f6"},
             }
         )
+        latest_parts: list[str] = []
+        if hist:
+            for v in reversed(hist):
+                if v is not None:
+                    latest_parts.append(f"MACD {v:.4f}")
+                    break
+        if dif:
+            for v in reversed(dif):
+                if v is not None:
+                    latest_parts.append(f"DIF {v:.4f}")
+                    break
+        if dea:
+            for v in reversed(dea):
+                if v is not None:
+                    latest_parts.append(f"DEA {v:.4f}")
+                    break
+        if latest_parts:
+            macd_latest_text = " · ".join(latest_parts)
+
+    # Signal markers scatter
+    has_signals = signal_scatter is not None and len(signal_scatter) > 0
+    if has_signals:
+        series.append({
+            "type": "scatter",
+            "name": "信号",
+            "data": signal_scatter,
+            "xAxisIndex": 0,
+            "yAxisIndex": 0,
+            "z": 10,
+            "tooltip": {"formatter": "KLINE_SIGNAL_TOOLTIP"},
+        })
 
     legend_names = [symbol] + [m["name"] for m in ma_lines]
+    if has_macd:
+        legend_names.extend(["MACD", "DIF", "DEA"])
+    if has_signals:
+        legend_names.append("信号")
     n_grids = len(grids)
     data_zoom = [
         {"type": "inside", "xAxisIndex": list(range(n_grids))},
@@ -612,6 +649,8 @@ def _build_symbol_candle_option(
             "text": symbol,
             "left": "left",
             "textStyle": {"color": "#fff", "fontSize": 14},
+            "subtext": macd_latest_text,
+            "subtextStyle": {"color": "#9aa4b2", "fontSize": 12},
         },
         "tooltip": {
             "trigger": "axis",
@@ -646,7 +685,33 @@ def _build_echarts_html(chart_configs: list[dict]) -> str:
             f'<div id="{cid}" style="width:100%;height:{h}px;margin-bottom:6px;"></div>'
         )
         inits.append(f'ch["{cid}"]=echarts.init(document.getElementById("{cid}"),"dark");')
-        opts.append(f'ch["{cid}"].setOption({json.dumps(cfg["option"], ensure_ascii=False)});')
+        opt_json = json.dumps(cfg["option"], ensure_ascii=False)
+        # Replace tooltip formatter placeholder with JS function reference
+        opt_json = opt_json.replace('"KLINE_SIGNAL_TOOLTIP"', 'klineSignalTooltip')
+        opts.append(f'ch["{cid}"].setOption({opt_json});')
+
+    # Signal tooltip formatter — data value encoding:
+    # value[0]=barIndex, value[1]=y, value[2]=signal_name, value[3]=freq,
+    # value[4]=side, value[5]=signal(BUY/SELL), value[6]=price, value[7]=reason
+    signal_tip_js = """
+function klineSignalTooltip(params) {
+    var d = params.data;
+    if (!d || !d.value || !Array.isArray(d.value)) return params.value;
+    var v = d.value;
+    if (v.length < 5) return params.value;
+    var dir = v[4] === 'long' ? '做多' : '做空';
+    var op = v[5] || '-';
+    var html = '<div style="font-size:13px;line-height:1.8;max-width:320px;">' +
+        '<b>' + _e(v[2] || '') + '</b><br/>' +
+        '周期: ' + _e(v[3] || '-') + ' | ' +
+        '方向: ' + dir + ' | 操作: ' + op + '<br/>' +
+        '价格: ' + _e(v[6] || '-') +
+        (v[7] ? '<br/><span style="color:#999;">' + _e(v[7]) + '</span>' : '') +
+        '</div>';
+    return html;
+}
+function _e(s) { return String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+"""
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -655,6 +720,7 @@ def _build_echarts_html(chart_configs: list[dict]) -> str:
 </head><body>
 {"".join(divs)}
 <script>
+{signal_tip_js}
 (function(){{var ch={{}};
 {"".join(inits)}
 var lst=Object.values(ch);
@@ -732,6 +798,72 @@ def _to_echarts_macd(prep: pd.DataFrame, macd_keys: dict[str, str]) -> dict[str,
         else:
             out[role] = [None if pd.isna(v) else round(float(v), 6) for v in prep[col]]
     return out
+
+
+def _map_signals_to_bars(prep: pd.DataFrame, signals_df: pd.DataFrame) -> list[dict]:
+    """将信号按 signal_date 匹配到 K 线 bar 索引（按 date 部分匹配）。"""
+    if signals_df.empty:
+        return []
+    bar_dates = prep["_x"].tolist()
+    result: list[dict] = []
+    for _, sig in signals_df.iterrows():
+        sig_dt = sig["signal_date"]
+        matched_idx = None
+        for i, bdt in enumerate(bar_dates):
+            if bdt.date() == sig_dt.date():
+                matched_idx = i
+                break
+        if matched_idx is None:
+            continue
+        result.append({
+            "barIndex": matched_idx,
+            "side": str(sig.get("side", "")),
+            "signal": str(sig.get("signal", "")),
+            "signal_name": str(sig.get("signal_name", "")),
+            "freq": str(sig.get("freq", "")),
+            "price": float(sig["price"]) if pd.notna(sig.get("price")) else None,
+            "reason": str(sig.get("reason", ""))[:120] if pd.notna(sig.get("reason")) else "",
+        })
+    return result
+
+
+def _build_signal_scatter_data(signals: list[dict], ohlc: list[list[float]]) -> list[dict]:
+    """构建 ECharts 信号标记 scatter 数据（long=green up, short=red down）。"""
+    if not signals:
+        return []
+    data: list[dict] = []
+    for sig in signals:
+        idx = sig["barIndex"]
+        if idx < 0 or idx >= len(ohlc):
+            continue
+        ohlc_row = ohlc[idx]
+        high = ohlc_row[3]
+        low = ohlc_row[2]
+        if sig["side"] == "long":
+            y = high * 1.03
+            color = "#26a69a"
+            rotate = 0  # triangle points up
+        else:
+            y = low * 0.97
+            color = "#ef5350"
+            rotate = 180  # triangle points down
+        data.append({
+            "value": [
+                idx,
+                round(y, 2),
+                sig["signal_name"],
+                sig["freq"],
+                sig["side"],
+                sig["signal"],
+                str(round(sig["price"], 2)) if sig["price"] else "-",
+                sig["reason"],
+            ],
+            "symbol": "triangle",
+            "symbolRotate": rotate,
+            "itemStyle": {"color": color, "opacity": 0.9},
+            "symbolSize": 16,
+        })
+    return data
 
 
 # ===========================================================

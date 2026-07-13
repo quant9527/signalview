@@ -19,6 +19,7 @@ CREATE TABLE instrument_group_member (
     group_name VARCHAR(100) NOT NULL,
     exchange VARCHAR(20) NOT NULL,
     symbol VARCHAR(20) NOT NULL,
+    reverse BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT uk_group_member UNIQUE (group_name, exchange, symbol),
@@ -32,3 +33,4 @@ COMMENT ON TABLE instrument_group_member IS '自选股分组成員表，记录�
 COMMENT ON COLUMN instrument_group_member.group_name IS '所属分组名称';
 COMMENT ON COLUMN instrument_group_member.exchange IS '标的交易所';
 COMMENT ON COLUMN instrument_group_member.symbol IS '标的代码';
+COMMENT ON COLUMN instrument_group_member.reverse IS '是否为 reverse 标的';

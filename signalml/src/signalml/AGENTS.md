@@ -1,5 +1,5 @@
 <!-- Parent: ../../../AGENTS.md -->
-<!-- Generated: 2026-05-08 | Updated: 2026-05-08 -->
+<!-- Generated: 2026-05-08 | Updated: 2026-07-16 -->
 
 # signalml
 

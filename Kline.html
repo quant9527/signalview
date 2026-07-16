@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>K线多标的联动 · 买卖信号叠加</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #161b22;
+    --border: #2b333d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --up: #26a69a;    /* 涨/买 */
+    --down: #ef5350;  /* 跌/卖 */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .legend { display: flex; gap: 18px; color: var(--muted); font-size: 13px; }
+  .legend b { color: var(--text); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    vertical-align: middle; margin-right: 5px; }
+  .charts { padding: 8px 12px 24px; }
+  .chart { width: 100%; height: 360px; margin-bottom: 6px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+  .hint { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>K线多标的联动 · 买卖信号叠加</h1>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--up)"></span>买入 BUY</span>
+    <span><span class="dot" style="background:var(--down)"></span>卖出 SELL</span>
+    <span class="hint">滚轮/拖拽缩放 · 十字光标与缩放多图同步 · 鼠标移到信号图标查看详情</span>
+  </div>
+</header>
+<div id="charts" class="charts"></div>
+
+<script>
+// ============================================================
+// 数据 — 由后端注入（Python 替换 __SYMBOLS_DATA__ 为真实数据）
+// ============================================================
+const SYMBOLS = __SYMBOLS_DATA__;
+
+// ============================================================
+// 2) 构建单个图表配置
+// ============================================================
+const UP = '#26a69a', DOWN = '#ef5350', BORDER = '#2b333d', MUTED = '#8b949e';
+
+function buildOption(sym) {
+  // 一根 K 线可能有多条信号：按 idx 聚合，供 tooltip 使用
+  const sigByIdx = {};
+  sym.signals.forEach(s => { (sigByIdx[s.idx] ||= []).push(s); });
+
+  // 把信号整理成 scatter 数据：BUY 在最低价下方，SELL 在最高价上方。
+  // 同一根 K 线、同一方向的多条信号，用像素偏移逐个堆叠避免重叠。
+  const buyPts = [], sellPts = [];
+  const stackCount = {}; // key: `${idx}-${type}` -> 已堆叠数量
+  sym.signals.forEach(s => {
+    const key = s.idx + '-' + s.type;
+    const n = stackCount[key] = (stackCount[key] || 0);
+    stackCount[key]++;
+    if (s.type === 'BUY') {
+      buyPts.push({ value: [s.idx, s.price], sig: s, symbolOffset: [0, 12 + n * 16] });
+    } else {
+      sellPts.push({ value: [s.idx, s.price], sig: s, symbolOffset: [0, -12 - n * 16] });
+    }
+  });
+
+  // 箭头图标（SVG path）
+  const arrowUp = 'path://M512 128 L864 640 L608 640 L608 896 L416 896 L416 640 L160 640 Z';
+  const arrowDown = 'path://M512 896 L160 384 L416 384 L416 128 L608 128 L608 384 L864 384 Z';
+
+  return {
+    animation: false,
+    backgroundColor: 'transparent',
+    title: {
+      text: sym.name, left: 12, top: 6,
+      textStyle: { color: '#e6edf3', fontSize: 14, fontWeight: 600 }
+    },
+    // ---- 固定位置 tooltip：单行，钉在绘图区左上角 ----
+    tooltip: {
+      trigger: 'axis',
+      triggerOn: 'mousemove',
+      axisPointer: { type: 'cross', link: [{ xAxisIndex: 'all' }],
+        label: { backgroundColor: '#3b4754' } },
+      backgroundColor: 'rgba(22,27,34,0.95)',
+      borderColor: BORDER, borderWidth: 1, padding: [4, 10],
+      textStyle: { color: '#c9d1d9', fontSize: 12 },
+      // 与标的名同一行，向右错开避免遮挡
+      position: function (pt, params, dom, rect, size) {
+        return [110, 4];
+      },
+      formatter: function (params) {
+        const p = params.find(x => x.seriesType === 'candlestick') || params[0];
+        const i = p.dataIndex;
+        const k = sym.kline[i];
+        const sep = `<span style="color:${BORDER}">|</span>`;
+        // 第一行：日期 + OHLC，仍用 | 分隔
+        let head = [`<b>${sym.dates[i]}</b>`];
+        if (k) {
+          const color = k[1] >= k[0] ? UP : DOWN;
+          head.push(
+            `<span style="color:${MUTED}">开</span><span style="color:${color}">${k[0]}</span>`,
+            `<span style="color:${MUTED}">收</span><span style="color:${color}">${k[1]}</span>`,
+            `<span style="color:${MUTED}">低</span>${k[2]}`,
+            `<span style="color:${MUTED}">高</span>${k[3]}`
+          );
+        }
+        let html = head.join(` ${sep} `);
+
+        // 均线
+        const mas = sym.ma_lines || [];
+        if (mas.length) {
+          const maParts = mas.map(ma => {
+            const v = ma.data[i];
+            if (v == null) return '';
+            return `<span style="color:${ma.color}">${ma.name}</span>${v.toFixed(2)}`;
+          }).filter(Boolean);
+          if (maParts.length) {
+            html += ` ${sep} ${maParts.join(` ${sep} `)}`;
+          }
+        }
+
+        // 信号：一条时接在同行，多条时每条单独一行
+        const sigs = sigByIdx[i] || [];
+        const fmt = s => {
+          const c = s.type === 'BUY' ? UP : DOWN;
+          return `<span style="color:${c};font-weight:700">${s.type === 'BUY' ? '买入' : '卖出'}·${s.strategy}</span> `
+            + `<span style="color:${MUTED}">@</span>${s.price} `
+            + (s.freq ? `<span style="color:${MUTED}">周期</span>${s.freq} ` : '')
+            + `<span style="color:${MUTED}">强度</span>${s.strength} `
+            + `<span style="color:${MUTED}">${s.reason}</span>`;
+        };
+        // 信号统一换行显示在 OHLC 下方，无论一条还是多条
+        html += sigs.map(s => `<div style="margin-top:2px">${fmt(s)}</div>`).join('');
+        return html;
+      }
+    },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    grid: [
+      { left: 60, right: 20, top: 40, height: 210 },   // K线
+      { left: 60, right: 20, top: 270, height: 60 }     // 成交量
+    ],
+    xAxis: [
+      { type: 'category', data: sym.dates, scale: true, boundaryGap: true,
+        axisLine: { lineStyle: { color: BORDER } }, axisLabel: { color: MUTED },
+        splitLine: { show: false }, min: 'dataMin', max: 'dataMax' },
+      { type: 'category', gridIndex: 1, data: sym.dates, boundaryGap: true,
+        axisLine: { lineStyle: { color: BORDER } }, axisLabel: { show: false },
+        axisTick: { show: false }, splitLine: { show: false } }
+    ],
+    yAxis: [
+      { scale: true, position: 'left', axisLine: { lineStyle: { color: BORDER } },
+        axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: '#1c232b' } } },
+      { scale: true, gridIndex: 1, splitNumber: 2, axisLine: { show: false },
+        axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } }
+    ],
+    // ---- 多图同步缩放 ----
+    dataZoom: [
+      { type: 'inside', xAxisIndex: [0, 1], start: 55, end: 100 },
+      { type: 'slider', xAxisIndex: [0, 1], bottom: 4, height: 16,
+        borderColor: BORDER, textStyle: { color: MUTED }, start: 55, end: 100 }
+    ],
+    series: [
+      {
+        name: 'K线', type: 'candlestick', data: sym.kline,
+        itemStyle: { color: UP, color0: DOWN, borderColor: UP, borderColor0: DOWN }
+      },
+      ...(sym.ma_lines || []).map(ma => ({
+        name: ma.name, type: 'line', data: ma.data,
+        symbol: 'none', lineStyle: { width: 1.2, color: ma.color },
+        xAxisIndex: 0, yAxisIndex: 0,
+      })),
+      {
+        name: '成交量', type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
+        data: sym.volumes.map(v => ({ value: v[1],
+          itemStyle: { color: v[2] > 0 ? 'rgba(38,166,154,.5)' : 'rgba(239,83,80,.5)' } }))
+      },
+      {
+        name: '买入', type: 'scatter', data: buyPts,
+        symbol: arrowUp, symbolSize: 16,
+        itemStyle: { color: UP },
+        tooltip: { show: false },  // 详情走 axis tooltip，避免双弹窗
+        z: 10
+      },
+      {
+        name: '卖出', type: 'scatter', data: sellPts,
+        symbol: arrowDown, symbolSize: 16,
+        itemStyle: { color: DOWN },
+        tooltip: { show: false },
+        z: 10
+      }
+    ]
+  };
+}
+
+// ============================================================
+// 3) 渲染 + 联动
+// ============================================================
+const GROUP = 'kline-group';
+const container = document.getElementById('charts');
+const instances = [];
+
+SYMBOLS.forEach(sym => {
+  const el = document.createElement('div');
+  el.className = 'chart';
+  container.appendChild(el);
+  const chart = echarts.init(el, null, { renderer: 'canvas' });
+  chart.setOption(buildOption(sym));
+  chart.group = GROUP;
+  instances.push(chart);
+});
+
+// 关键：连接同步十字光标(tooltip/axisPointer) + dataZoom
+echarts.connect(GROUP);
+
+window.addEventListener('resize', () => instances.forEach(c => c.resize()));
+</script>
+</body>
+</html>

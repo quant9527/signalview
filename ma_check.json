@@ -1,0 +1,1 @@
+"{\n  \"hasMa\": true,\n  \"maCount\": 5,\n  \"maNames\": [\n    \"MA5\",\n    \"MA10\",\n    \"MA20\",\n    \"MA60\",\n    \"MA120\"\n  ],\n  \"sampleMa\": {\n    \"name\": \"MA5\",\n    \"dataLen\": 243,\n    \"color\": \"#ffeb3b\"\n  }\n}"

@@ -1,0 +1,1 @@
+"[\n  {\n    \"name\": \"000001\",\n    \"signalCount\": 31,\n    \"sampleSignal\": {\n      \"idx\": 194,\n      \"type\": \"BUY\",\n      \"price\": 11.3,\n      \"strategy\": \"seg_surge\",\n      \"reason\": \"\",\n      \"strength\": \"34.12\"\n    }\n  }\n]"

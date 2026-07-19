@@ -27,6 +27,18 @@ from symbol_picker import SymbolToken, parse_symbol_tokens
 SYMBOL_CHART_HEIGHT = 600
 
 
+def _symbol_chart_height(chart_count: int) -> int:
+    """根据图表数量动态计算单个图表高度，使多个 symbol 能同时可见。
+
+    按常见 1080p 视口预留 ~110px 给顶部导航、标题和间距后分配高度，
+    同时保证单图不低于 240px 的可读下限。
+    """
+    if chart_count <= 1:
+        return SYMBOL_CHART_HEIGHT
+    available = 950 - 110
+    return max(240, available // chart_count)
+
+
 def _qp_str(key: str) -> str:
     return str(st.query_params.get(key, "") or "").strip()
 
@@ -144,6 +156,7 @@ def _build_charts(
 
     charts: list[dict] = []
     metas: dict[str, dict] = {}
+    chart_height = _symbol_chart_height(len(entries))
 
     for e in entries:
         if e.token not in sym_data:
@@ -163,7 +176,7 @@ def _build_charts(
         cid = f"ch_{len(metas)}"
         charts.append({
             "id": cid,
-            "height": SYMBOL_CHART_HEIGHT,
+            "height": chart_height,
             "option": kc.build_symbol_candle_option(
                 title=_chart_title(e, name_map),
                 labels=labels,
@@ -173,12 +186,24 @@ def _build_charts(
                 macd=macd,
                 has_volume=has_vol,
                 signals=signals or None,
+                height=chart_height,
             ),
         })
         metas[cid] = kc.build_chart_meta(labels, ohlc, ma_lines, signals)
 
     bar_counts = {tok: len(prep) for tok, (prep, _) in sym_data.items()}
     return charts, metas, bar_counts
+
+
+def _redirect_when_empty(raw_symbol: str) -> None:
+    """当 URL 中缺少有效 symbol 参数时，重定向到参数设置页。"""
+    # 直接跳转到 K 线参数设置页，不保留空参数入口
+    st.switch_page("views/kline.py")
+    # switch_page 会中断执行；兜底提示仅在异常场景出现
+    has_raw = bool(raw_symbol)
+    title = "参数格式无效" if has_raw else "缺少 K 线标的参数"
+    st.warning(title)
+    st.stop()
 
 
 def main() -> None:
@@ -190,10 +215,10 @@ def main() -> None:
     default_end = date.today()
     default_start = default_end - timedelta(days=365)
 
-    entries = parse_symbol_tokens(_qp_str("symbol"))
+    raw_symbol = _qp_str("symbol")
+    entries = parse_symbol_tokens(raw_symbol)
     if not entries:
-        st.info("URL 中无 `symbol` 参数，请先到「参数设置」页选择标的。")
-        st.stop()
+        _redirect_when_empty(raw_symbol)
 
     start_d = _parse_iso_date(_qp_str("start")) or default_start
     end_d = _parse_iso_date(_qp_str("end")) or default_end

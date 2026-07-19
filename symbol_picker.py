@@ -46,6 +46,19 @@ def parse_symbols_with_exchange(
     return result
 
 
+def _clean_symbol_code(sym: str) -> str:
+    """去掉 instrument 表中 symbol 列的后缀元数据，只保留纯代码。
+
+    某些 instrument 表的 symbol 列存储格式为 "代码_名称_拼音别名"（如
+    "881145_电力_dl_DL"），而 Flight 查询只需要纯代码。
+    """
+    if "_" in sym:
+        prefix = sym.split("_", 1)[0]
+        if prefix.isdigit() and len(prefix) == 6:
+            return prefix
+    return sym
+
+
 def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
     """
     Render exchange selector + searchable symbol dropdown + add button in one row.
@@ -116,7 +129,7 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
         add_clicked = st.button("添加", key=f"{key_prefix}_add", width="stretch")
 
     if add_clicked:
-        sym_val = str(a_symbol).strip()
+        sym_val = _clean_symbol_code(str(a_symbol).strip())
         if sym_val:
             return (a_exchange, sym_val)
     return None

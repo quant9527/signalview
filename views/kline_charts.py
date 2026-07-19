@@ -435,20 +435,32 @@ def build_chart_meta(
 # ===========================================================
 
 
-def _kline_grids(has_volume: bool, has_macd: bool) -> list[dict]:
-    """K 线 / 成交量 / MACD 子图布局（按 600px 高的图表面板，MACD 占 100px）。"""
+def _kline_grids(has_volume: bool, has_macd: bool, total_height: int) -> list[dict]:
+    """K 线 / 成交量 / MACD 子图布局，按 total_height 动态分配比例。
+
+    顶部预留 40px 给标题，底部预留 20px，剩余空间按比例划分，
+    避免小高度下图表子图重叠。
+    """
+    top = 40
+    bottom = 20
+    usable = max(100, total_height - top - bottom)
+
     if has_volume and has_macd:
+        kline_h = int(usable * 0.55)
+        vol_h = int(usable * 0.15)
+        macd_top = top + kline_h + vol_h
         return [
-            {"left": 60, "right": 20, "top": 40, "height": 280},
-            {"left": 60, "right": 20, "top": 340, "height": 80},
-            {"left": 60, "right": 20, "top": 440, "bottom": 60},
+            {"left": 60, "right": 20, "top": top, "height": kline_h},
+            {"left": 60, "right": 20, "top": top + kline_h, "height": vol_h},
+            {"left": 60, "right": 20, "top": macd_top, "bottom": bottom},
         ]
     if has_volume or has_macd:
+        kline_h = int(usable * 0.70)
         return [
-            {"left": 60, "right": 20, "top": 40, "height": 360},
-            {"left": 60, "right": 20, "top": 420, "bottom": 60},
+            {"left": 60, "right": 20, "top": top, "height": kline_h},
+            {"left": 60, "right": 20, "top": top + kline_h, "bottom": bottom},
         ]
-    return [{"left": 60, "right": 20, "top": 40, "bottom": 60}]
+    return [{"left": 60, "right": 20, "top": top, "bottom": bottom}]
 
 
 def _grid_axes(n_grids: int, labels: list[str]) -> tuple[list[dict], list[dict]]:
@@ -529,10 +541,11 @@ def build_symbol_candle_option(
     macd: dict[str, list[float | None]] | None,
     has_volume: bool,
     signals: list[dict] | None = None,
+    height: int = 600,
 ) -> dict:
     """单个标的的 K 线 + 成交量 + MACD + 信号箭头（Kline.html 风格）。"""
     has_macd = macd is not None
-    grids = _kline_grids(has_volume, has_macd)
+    grids = _kline_grids(has_volume, has_macd, height)
     n_grids = len(grids)
     x_axes, y_axes = _grid_axes(n_grids, labels)
 

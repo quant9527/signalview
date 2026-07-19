@@ -1,5 +1,10 @@
 import streamlit as st
 
+from reports_server import start_reports_server
+
+# Start a local read-only HTTP server for backtest report HTML files
+start_reports_server()
+
 # Configure the page to use wide layout
 st.set_page_config(layout="wide")
 
@@ -20,14 +25,17 @@ pages = {
         st.Page("views/main_then_yd.py", title="主→yd", icon="🔗"),
     ],
     "K线": [
-        st.Page("views/kline.py", title="参数设置", icon="🕯️"),
-        st.Page("views/kline_fullscreen.py", title="全屏图表", icon="🖥️"),
+        st.Page("views/kline.py", title="参数设置", icon="🕯️", url_path="kline"),
+        st.Page("views/kline_fullscreen.py", title="K线图表", icon="📈", url_path="kline_fullscreen"),
     ],
     "Review": [
         st.Page("views/overview.py", title="Overview", icon="🏠"),
         st.Page("views/review_today.py", title="Today Review", icon="📋"),
         st.Page("views/review_em.py", title="EM Review", icon="📋"),
         st.Page("views/review_key.py", title="Key Review", icon="⭐"),
+    ],
+    "Reports": [
+        st.Page("views/backtest_reports.py", title="Backtest Reports", icon="📈"),
     ],
     "Performance": [
         st.Page("views/performance.py", title="Performance", icon="📊"),

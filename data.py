@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -208,7 +210,6 @@ def _get_latest_market_as_spot_full() -> pd.DataFrame:
 
     import akshare as ak
 
-    last_err = None
     for attempt in range(3):
         try:
             if attempt > 0:
@@ -216,8 +217,7 @@ def _get_latest_market_as_spot_full() -> pd.DataFrame:
             market_df = ak.stock_zh_a_spot_em()
             if market_df is not None and not market_df.empty:
                 return _normalize_market_df_columns(market_df)
-        except Exception as e:
-            last_err = e
+        except Exception:
             if attempt < 2:
                 continue
     try:
@@ -448,8 +448,6 @@ def get_sector_constituents_from_db(sector_symbol: str, sector_exchange: str = '
 # ============================================================================
 # 共享数据库连接（复用，避免每个函数都新建连接）
 # ============================================================================
-import os
-
 
 def _get_conn_str():
     """获取 PostgreSQL 连接字符串。"""
@@ -593,23 +591,40 @@ def remove_instrument_group_member(group_name: str, exchange: str, symbol: str) 
         return False
 
 
-def get_kline_signals(exchange: str, symbol: str, start_date, end_date) -> pd.DataFrame:
-    """获取 K 线图上展示的多空信号（轻量，只取必要字段）。"""
+def get_kline_signals(
+    exchange: str,
+    symbol: str,
+    start_date,
+    end_date,
+    freq: str | None = None,
+) -> pd.DataFrame:
+    """获取 K 线图上展示的多空信号（轻量，只取必要字段）。
+
+    Parameters
+    ----------
+    freq : str | None
+        若提供，只返回与当前图表周期一致的信号，避免在日线图上堆叠大量日内信号。
+    """
     from utils import normalize_signal_date_field
     try:
-        df = _query_df("""
-            SELECT signal_date, signal_name, side, signal, freq, price, reason
+        params: list = [exchange, symbol, start_date, end_date]
+        freq_clause = ""
+        if freq:
+            params.append(freq)
+            freq_clause = " AND freq = %s"
+        df = _query_df(f"""
+            SELECT signal_date, signal_name, side, signal, freq, price, reason, score
             FROM signal
             WHERE exchange = %s AND symbol = %s
               AND signal_date >= %s AND signal_date < (%s::date + interval '1 day')
-              AND side IS NOT NULL
+              AND side IS NOT NULL{freq_clause}
             ORDER BY signal_date
-        """, (exchange, symbol, start_date, end_date))
+        """, tuple(params))
         if not df.empty:
             df = normalize_signal_date_field(df, 'signal_date', 'Asia/Shanghai')
         return df
     except Exception as e:
-        print(f"[kline_signals] {e}")
+        st.warning(f"查询 K 线信号失败: {e}")
         return pd.DataFrame()
 
 

@@ -1,26 +1,54 @@
 """
 可复用的多交易所 Symbol 选择器组件。
 
-提供两个函数：
+提供四个函数：
 - symbol_picker_add_ui — 交易所 + 可搜索代码下拉 + 添加按钮
-- symbol_picker_selected_ui — 已选标的展示 + × 删除按钮
+- symbol_quick_add_ui — 渲染常用标的 pills，点击直接添加（如 asindex:sh000300）
+- symbol_picker_selected_ui — 已选标的（exchange:symbol）展示 + 点击取消删除
+- symbol_tokens_selected_ui — 已选编码 token（如 as:000001:1d）展示 + 点击取消删除
 
 用途：用于 K 线页、信号搜索页等需要用户选择不同交易所标的的场景。
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable, NamedTuple
 
 import streamlit as st
 
-from constants import KLINE_EXCHANGE_OPTIONS
+from constants import KLINE_DEFAULT_FREQ, KLINE_EXCHANGE_OPTIONS, KLINE_FREQ_SET
 from data import get_instruments_by_exchange
+
+
+def _split_symbol_input(raw: str) -> list[str]:
+    """将逗号/中文逗号分隔的代码串解析为列表。"""
+    return [s.strip() for s in raw.replace("，", ",").split(",") if s.strip()]
+
+
+def parse_symbols_with_exchange(
+    raw: str, default_exchange: str
+) -> list[tuple[str, str]]:
+    """解析逗号分隔的 symbol 列表，支持 exchange:symbol 格式。"""
+    result: list[tuple[str, str]] = []
+    for s in _split_symbol_input(raw):
+        if ":" in s:
+            ex, sym = s.split(":", 1)
+            ex = ex.strip().lower()
+            sym = sym.strip()
+        else:
+            ex = default_exchange.lower()
+            sym = s.strip()
+        if not sym:
+            continue
+        if ex not in KLINE_EXCHANGE_OPTIONS:
+            ex = default_exchange
+        result.append((ex, sym))
+    return result
 
 
 def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
     """
-    Render exchange selector + searchable symbol dropdown + add button.
+    Render exchange selector + searchable symbol dropdown + add button in one row.
 
     下拉选项包含「代码  名称  [别名]」，alias 中包含拼音首字母，
     Streamlit 自带搜索可直接匹配（如输入"jfy"找到"减肥药"）。
@@ -30,54 +58,115 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
     (exchange, symbol) | None
         点「＋ 添加」时返回 (exchange, symbol)，否则返回 None。
     """
-    a_exchange: str = st.selectbox(
-        "交易所",
-        options=list(KLINE_EXCHANGE_OPTIONS),
-        key=f"{key_prefix}_exchange",
-    )
+    c1, c2, c3 = st.columns([1, 2, 1], vertical_alignment="bottom")
+    with c1:
+        a_exchange: str = st.selectbox(
+            "交易所",
+            options=list(KLINE_EXCHANGE_OPTIONS),
+            key=f"{key_prefix}_exchange",
+            label_visibility="collapsed",
+            placeholder="交易所",
+        )
 
     add_inst = get_instruments_by_exchange(a_exchange)
-    if not add_inst.empty:
-        sym_list = sorted(add_inst["symbol"].tolist())
-        name_map: dict[str, Any] = dict(
-            zip(add_inst["symbol"], add_inst["name"], strict=False)
-        )
-        # alias_map: symbol -> extra identifiers (pinyin initials, etc.)
-        if "alias" in add_inst.columns:
-            alias_map: dict[str, str] = {}
-            for _, row in add_inst.iterrows():
-                aliases = row.get("alias")
-                if isinstance(aliases, (list, tuple)):
-                    sym_low = str(row["symbol"]).lower()
-                    nam_low = str(row.get("name", "")).lower()
-                    extra = [str(a) for a in aliases
-                             if str(a).lower() not in (sym_low, nam_low)]
-                    if extra:
-                        alias_map[row["symbol"]] = "_".join(extra)
+    with c2:
+        if not add_inst.empty:
+            sym_list = sorted(add_inst["symbol"].tolist())
+            name_map: dict[str, Any] = dict(
+                zip(add_inst["symbol"], add_inst["name"], strict=False)
+            )
+            if "alias" in add_inst.columns:
+                alias_map: dict[str, str] = {}
+                for _, row in add_inst.iterrows():
+                    aliases = row.get("alias")
+                    if isinstance(aliases, (list, tuple)):
+                        sym_low = str(row["symbol"]).lower()
+                        nam_low = str(row.get("name", "")).lower()
+                        extra = [
+                            str(a)
+                            for a in aliases
+                            if str(a).lower() not in (sym_low, nam_low)
+                        ]
+                        if extra:
+                            alias_map[row["symbol"]] = "_".join(extra)
+            else:
+                alias_map = {}
+
+            a_symbol: str = st.selectbox(
+                "代码",
+                options=sym_list,
+                format_func=lambda s: (
+                    f"{s}"
+                    + (f"_{name_map.get(s, '')}" if name_map.get(s, "") else "")
+                    + (f"_{alias_map.get(s, '')}" if alias_map.get(s) else "")
+                ),
+                key=f"{key_prefix}_symbol_select",
+                label_visibility="collapsed",
+                placeholder="代码",
+            )
         else:
-            alias_map = {}
+            a_symbol = st.text_input(
+                "代码",
+                key=f"{key_prefix}_symbol_input",
+                placeholder="600519 / sh000300 / BTC",
+                label_visibility="collapsed",
+            )
 
-        a_symbol: str = st.selectbox(
-            "代码",
-            options=sym_list,
-            format_func=lambda s: (
-                f"{s}"
-                + (f"_{name_map.get(s, '')}" if name_map.get(s, "") else "")
-                + (f"_{alias_map.get(s, '')}" if alias_map.get(s) else "")
-            ),
-            key=f"{key_prefix}_symbol_select",
-        )
-    else:
-        a_symbol = st.text_input(
-            "代码",
-            key=f"{key_prefix}_symbol_input",
-            placeholder="600519 / sh000300 / BTC",
-        )
+    with c3:
+        add_clicked = st.button("添加", key=f"{key_prefix}_add", width="stretch")
 
-    if st.button("＋ 添加"):
+    if add_clicked:
         sym_val = str(a_symbol).strip()
         if sym_val:
             return (a_exchange, sym_val)
+    return None
+
+
+def symbol_quick_add_ui(
+    presets: list[tuple[str, str]],
+    label_func: Callable[[str, str], str] | None = None,
+    selected: set[tuple[str, str]] | None = None,
+    key_prefix: str = "sp_quick",
+) -> tuple[str, str] | None:
+    """
+    快捷添加标的：渲染一排可切换的按钮，点击后返回该标的。
+
+    按钮会根据当前是否已选切换样式：已选为 primary，未选为 tertiary。
+
+    Parameters
+    ----------
+    presets : list[tuple[str, str]]
+        预设的 (exchange, symbol) 列表，如 [("asindex", "sh000300"), ...]。
+    label_func : Callable[[str, str], str] | None
+        自定义按钮显示文本，接收 (exchange, symbol) 返回 label；
+        为空时默认显示 "exchange:symbol"。
+    selected : set[tuple[str, str]] | None
+        当前已选中的预设标的集合，用于决定按钮样式。
+    key_prefix : str
+        Streamlit widget key 前缀。
+
+    Returns
+    -------
+    tuple[str, str] | None
+        用户点击某个按钮时返回对应的 (exchange, symbol)；否则返回 None。
+    """
+    if not presets:
+        return None
+
+    _label = label_func if label_func is not None else lambda ex, sym: f"{ex}:{sym}"
+    selected_set = selected if selected is not None else set()
+
+    with st.container(horizontal=True):
+        for i, (ex, sym) in enumerate(presets):
+            is_selected = (ex, sym) in selected_set
+            display = _label(ex, sym)
+            if st.button(
+                display,
+                key=f"{key_prefix}_btn_{i}",
+                type="primary" if is_selected else "tertiary",
+                help=f"{'取消选择' if is_selected else '选择'} {ex}:{sym}",
+            ):
+                return (ex, sym)
     return None
 
 
@@ -86,7 +175,7 @@ def symbol_picker_selected_ui(
     key_prefix: str = "sp",
 ) -> int | None:
     """
-    已选标的：使用 multiselect tag 展示，点击 × 即可删除。
+    已选标的：使用按钮展示，点击即可删除。
 
     Parameters
     ----------
@@ -100,27 +189,139 @@ def symbol_picker_selected_ui(
     int | None
         用户删除了哪个 index 的项，否则 None。
     """
-    if not selected:
+    st.markdown(f"**已选标的（{len(selected)}）**")
+    options = [f"{ex}:{sym}" for ex, sym in selected]
+    if not options:
         return None
 
-    st.markdown(f"**已选标的（{len(selected)}）**  ·  点击标签右侧 `×` 删除")
-    options = [f"{ex}:{sym}" for ex, sym in selected]
-    source_key = f"{key_prefix}_selected_source"
-    state_key = f"{key_prefix}_selected_tags"
-    prev_source = st.session_state.get(source_key)
-    if prev_source != options:
-        st.session_state[source_key] = list(options)
-        st.session_state[state_key] = list(options)
+    clicked_idx: int | None = None
+    with st.container(horizontal=True):
+        for i, label in enumerate(options):
+            if st.button(f"{label} ×", key=f"{key_prefix}_del_{i}", type="tertiary"):
+                clicked_idx = i
+    return clicked_idx
 
-    curr_selected: list[str] = st.multiselect(
+
+# ============================================================
+# K 线 URL symbol 编码：exchange:symbol:freq[:reverse]，逗号分隔多个
+# ============================================================
+
+
+class SymbolToken(NamedTuple):
+    """K 线单个标的的完整参数（对应 URL 中一段 token）。"""
+
+    exchange: str
+    symbol: str
+    freq: str = KLINE_DEFAULT_FREQ
+    reverse: bool = False
+
+    @property
+    def token(self) -> str:
+        return encode_symbol_token(self.exchange, self.symbol, self.freq, self.reverse)
+
+
+def encode_symbol_token(
+    exchange: str,
+    symbol: str,
+    freq: str = KLINE_DEFAULT_FREQ,
+    reverse: bool = False,
+) -> str:
+    """编码为 URL token：`as:000001:1d` 或 `asindex:sh000300:1w:reverse`。"""
+    ex = str(exchange).strip().lower()
+    sym = str(symbol).strip()
+    fq = freq if freq in KLINE_FREQ_SET else KLINE_DEFAULT_FREQ
+    base = f"{ex}:{sym}:{fq}"
+    return f"{base}:reverse" if reverse else base
+
+
+def parse_symbol_tokens(raw: str | None) -> list[SymbolToken]:
+    """解析 URL `symbol` 参数（逗号分隔的 token 列表）。"""
+    if not raw:
+        return []
+    entries: list[SymbolToken] = []
+    for tok in _split_symbol_input(raw):
+        parts = tok.split(":")
+        if len(parts) < 2:
+            continue
+        ex = parts[0].strip().lower()
+        sym = parts[1].strip()
+        freq = parts[2].strip() if len(parts) > 2 else ""
+        reverse = len(parts) > 3 and parts[3].strip().lower() == "reverse"
+        if not ex or not sym:
+            continue
+        if freq not in KLINE_FREQ_SET:
+            freq = KLINE_DEFAULT_FREQ
+        entries.append(SymbolToken(ex, sym, freq, reverse))
+    return entries
+
+
+def symbol_tokens_selected_ui(
+    tokens: list[str],
+    key_prefix: str = "spt",
+    show_clear_button: bool = False,
+) -> int | str | None:
+    """
+    已选 token 展示（如 `as:000001:1d`、`asindex:sh000300:1w:reverse`），
+    以可点击的 pills 按钮形式展示，点击即可删除。
+
+    Parameters
+    ----------
+    tokens : list[str]
+        当前已选 token 列表。
+    key_prefix : str
+        Streamlit widget key 前缀。
+    show_clear_button : bool
+        是否在标题右侧显示「清空」按钮。
+
+    Returns
+    -------
+    int | str | None
+        用户删除了哪个 index 的项；点「清空」时返回 "clear"；否则返回 None。
+    """
+    c1, c2 = st.columns([4, 1], vertical_alignment="center")
+    with c1:
+        st.markdown(f"**已选标的（{len(tokens)}）**")
+    with c2:
+        clear_clicked = (
+            show_clear_button
+            and tokens
+            and st.button("清空", key=f"{key_prefix}_clear", type="tertiary")
+        )
+
+    options = list(tokens)
+    state_key = f"{key_prefix}_selected_tags"
+    options_key = f"{key_prefix}_options"
+    if not options:
+        # 清理旧状态，避免下次新增 token 时被旧选项干扰
+        if state_key in st.session_state:
+            del st.session_state[state_key]
+        if options_key in st.session_state:
+            del st.session_state[options_key]
+        return "clear" if clear_clicked else None
+
+    # 当 options 列表发生变化（URL 新增/删除 token）时，重置选中态为当前全部
+    prev_options = st.session_state.get(options_key)
+    if prev_options != options:
+        st.session_state[state_key] = options
+        st.session_state[options_key] = options
+
+    # 避免同时传 default 和通过 session_state 设值而触发 Streamlit 警告
+    kwargs: dict[str, Any] = {"label_visibility": "collapsed"}
+    if state_key not in st.session_state:
+        kwargs["default"] = options
+
+    curr_selected = st.pills(
         "已选标的",
         options=options,
+        selection_mode="multi",
         key=state_key,
-        label_visibility="collapsed",
-        placeholder="点击标签右侧 × 删除",
+        **kwargs,
     )
+    curr_selected = curr_selected if isinstance(curr_selected, list) else []
     removed = [x for x in options if x not in curr_selected]
     if removed:
         return options.index(removed[0])
+    if clear_clicked:
+        return "clear"
 
     return None

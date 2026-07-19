@@ -86,7 +86,7 @@ def fetch_kline_dataframe(
     """
     单次 do_get，返回 Flight 完整 K 线表（多标的混表）。
     请求体与 quant-lab / signalview data._get_latest_market_flight 一致。
-    kline_reverse：与 quant-lab 一致，控制服务端是否倒序返回 K 线。
+    kline_reverse：与 quant-lab 一致，控制服务端是否对 K 线做镜像反转处理。
     """
     if not tags:
         return None

@@ -28,8 +28,69 @@ if df.empty:
 df['signal_date'] = pd.to_datetime(df['signal_date'])
 
 # ============================================================================
+# 信号名称解析（必须在 df 处理之前定义）
+# ============================================================================
+
+
+def parse_signal_info(signal_name: str) -> tuple[str, str]:
+    """从 signal_name 提取交叉类型和买卖点类型，用于展示。
+
+    Returns:
+        (cross_type, buy_point) -- cross_type 如 macd/ma5ma10，buy_point 如 1b/2b/3b/surge
+    """
+    s = str(signal_name)
+
+    # rebc_macd_2b -> cross_type=macd, buy_point=2b
+    if s.startswith("rebc_"):
+        s = s[5:]  # strip 'rebc_'
+        # 去掉 cross_type 前缀后，剩下的就是 buy_point
+        for ct in ["ma5ma10", "macd", "surge"]:
+            if s.startswith(ct + "_"):
+                bp = s[len(ct) + 1:]
+                return (ct, bp.rstrip("_"))
+            elif s == ct:
+                # rebc_macd -> 1b
+                return (ct, "1b")
+
+    # bc_xd4_macd / bc_xd4_ma5ma10
+    if s.startswith("bc_xd4_"):
+        s2 = s[7:]
+        for ct in ["ma5ma10", "macd"]:
+            if s2 == ct or s2.startswith(ct):
+                return (ct, "xd")
+        return (s2, "xd")
+
+    # cmp_*, active_vol, nested_*, cl3b_* 等
+    parts = s.split("_")
+    if len(parts) >= 2:
+        if s.startswith("cmp_"):
+            ct_candidates = ["ma5ma10", "macd"]
+            for ct in ct_candidates:
+                if ct in parts:
+                    return (ct, "cmp")
+        if s.startswith("nested_"):
+            for ct in ["ma5ma10", "macd"]:
+                if ct in s:
+                    return (ct, "nested")
+        if s.startswith("active_vol"):
+            return ("vol", "active")
+        if s.startswith("cl3b_"):
+            for ct in ["ma5ma10", "macd"]:
+                if ct in s:
+                    return (ct, "3b_cl")
+    return ("-", "-")
+
+
+# 解析 signal_name 提取交叉类型和买卖点类型
+parsed = df['signal_name'].apply(parse_signal_info)
+df['cross_type'] = [p[0] for p in parsed]
+df['buy_point'] = [p[1] for p in parsed]
+
+
+# ============================================================================
 # 信号质量评分算法
 # ============================================================================
+
 
 def calculate_signal_score(row, all_signals_df, today, sector_data=None):
     """
@@ -256,20 +317,28 @@ for symbol, group in list(symbol_groups)[:10]:  # 只展示前10个标的
     
     # 最新信号日期
     latest_signal = group['signal_date'].max().strftime('%m-%d %H:%M') if len(group) > 0 else ''
-    
+
+    # 信号价格
+    signal_price = f"{row['price']:.2f}" if row.get('price') and pd.notna(row.get('price')) else 'N/A'
+
+    # 交叉类型和买卖点
+    cross_type = row.get('cross_type', '-')
+    buy_point = row.get('buy_point', '-')
+
     # 显示卡片
     with st.container():
         st.markdown(f"""
         <div style="border-left: 4px solid {border_color}; padding-left: 10px; margin: 10px 0;">
             <h4>{priority} | {symbol} {symbol_name} <span style="color:{border_color};font-size:1.2em">{score}分</span></h4>
             <p><strong>信号:</strong> {signal_badges}</p>
-            <p><small>交易所: {exchange} | 最新: {latest_signal}</small></p>
+            <p><strong>价格:</strong> {signal_price}</p>
+            <p><small>交叉: {cross_type} · {buy_point} | 交易所: {exchange} | 最新: {latest_signal}</small></p>
         </div>
         """, unsafe_allow_html=True)
         
         # 详细信息展开
         with st.expander(f"查看 {symbol} 详情", expanded=False):
-            detail_cols = ['signal_date', 'signal_name', 'exchange', 'score']
+            detail_cols = ['signal_date', 'price', 'cross_type', 'buy_point', 'signal_name', 'exchange', 'score']
             detail_df = group[detail_cols].copy()
             detail_df['signal_date'] = detail_df['signal_date'].dt.strftime('%Y-%m-%d %H:%M')
             detail_df['score'] = detail_df['score'].astype(int)
@@ -357,7 +426,7 @@ st.altair_chart(dist_chart, use_container_width=True)
 
 st.divider()
 with st.expander("📥 下载完整数据", expanded=False):
-    download_df = scored_df[['symbol', 'symbol_name', 'signal_name', 'signal_date', 'score', 'exchange']].copy()
+    download_df = scored_df[['symbol', 'symbol_name', 'signal_name', 'cross_type', 'buy_point', 'price', 'signal_date', 'score', 'exchange']].copy()
     download_df['signal_date'] = download_df['signal_date'].dt.strftime('%Y-%m-%d')
     download_df['score'] = download_df['score'].astype(int)
     

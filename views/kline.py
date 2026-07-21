@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 import sys
 from datetime import date, timedelta
-from html import escape as _html_escape
 from typing import Callable
 
 import pandas as pd
@@ -363,31 +362,38 @@ def main() -> None:
     if not entries:
         _redirect_when_empty(raw_symbol)
 
-    # ---------- 标的控制栏（freq pills + 删除）----------
+    # ---------- 标的控制栏（freq pills + popover 删除）----------
     freq_changed = False
     removed_idx: int | None = None
     for i, e in enumerate(entries):
         label = _name_of(e)
-        c1, c2, c3 = st.columns([2, 7, 1], vertical_alignment="center")
-        with c1:
-            c1.markdown(
-                f"<span style='white-space:nowrap;'>{_html_escape(label)}</span>",
-                unsafe_allow_html=True,
-            )
-        with c2:
-            new_freq = st.pills(
-                f"周期_{i}",
-                options=list(KLINE_FREQ_OPTIONS),
-                default=e.freq if e.freq in KLINE_FREQ_OPTIONS else KLINE_FREQ_OPTIONS[0],
-                key=f"kfs_freq_pills_{i}",
-                label_visibility="collapsed",
-            )
-            if new_freq and new_freq != e.freq:
-                freq_changed = True
-                entries[i] = SymbolToken(e.exchange, e.symbol, new_freq, e.reverse)
-        with c3:
-            if st.button("✕", key=f"kfs_rm_{i}", type="tertiary", help=f"移除 {label}"):
-                removed_idx = i
+        with st.container(border=True):
+            c_chip, c_freq = st.columns([3, 8], vertical_alignment="center", gap="small")
+            with c_chip:
+                with st.popover(
+                    label,
+                    icon=":material/settings:",
+                    help=f"{label} · 点开管理该标的",
+                ):
+                    if st.button(
+                        "删除该标的",
+                        key=f"kfs_rm_{i}",
+                        type="secondary",
+                        icon=":material/delete:",
+                        width="stretch",
+                    ):
+                        removed_idx = i
+            with c_freq:
+                new_freq = st.pills(
+                    f"周期_{i}",
+                    options=list(KLINE_FREQ_OPTIONS),
+                    default=e.freq if e.freq in KLINE_FREQ_OPTIONS else KLINE_FREQ_OPTIONS[0],
+                    key=f"kfs_freq_pills_{i}",
+                    label_visibility="collapsed",
+                )
+                if new_freq and new_freq != e.freq:
+                    freq_changed = True
+                    entries[i] = SymbolToken(e.exchange, e.symbol, new_freq, e.reverse)
 
     if removed_idx is not None:
         new_entries = [e for i, e in enumerate(entries) if i != removed_idx]

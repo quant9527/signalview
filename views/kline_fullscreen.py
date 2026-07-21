@@ -349,7 +349,7 @@ def main() -> None:
         st.rerun()
 
     # ---------- 搜索添加 ----------
-    add_result = symbol_picker_add_ui(key_prefix="kfs_add")
+    add_result = symbol_picker_add_ui(key_prefix="kfs_add", auto_trigger=True)
     if add_result is not None:
         ex, sym = add_result
         default_freq = entries[0].freq if entries else KLINE_DEFAULT_FREQ

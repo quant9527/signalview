@@ -149,7 +149,35 @@ def _text_input_fallback(key_prefix: str) -> str:
     )
 
 
-def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
+def _resolve_picked(
+    raw_sym: str,
+    a_exchange: str,
+    add_inst: pd.DataFrame,
+) -> tuple[str, str] | None:
+    """把 selectbox 选中的 raw symbol 解析成 (exchange, code)。
+
+    失败返回 None — 不会抛错。专门给 auto_trigger 路径用，避免重复
+    在 symbol_picker_add_ui 里铺同样的逻辑。
+    """
+    if not raw_sym:
+        return None
+    sym_val = _clean_symbol_code(raw_sym)
+    if not sym_val:
+        return None
+    if a_exchange == EXCHANGE_ALL and not add_inst.empty:
+        matched = add_inst[add_inst["symbol"].astype(str).str.strip() == raw_sym]
+        if not matched.empty:
+            actual_exchange = str(matched.iloc[0].get("_source_exchange", a_exchange))
+            return (actual_exchange, sym_val)
+        return ("as", sym_val)
+    return (a_exchange, sym_val)
+
+
+def symbol_picker_add_ui(
+    key_prefix: str = "sp",
+    *,
+    auto_trigger: bool = False,
+) -> tuple[str, str] | None:
     """
     Render exchange selector + searchable symbol dropdown + add button in one row.
 
@@ -157,10 +185,22 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
     Streamlit 自带搜索可直接匹配（如输入"jfy"找到"减肥药"）。
     symbol selectbox 使用 index=None，输入即搜索，不会被旧值干扰。
 
+    Parameters
+    ----------
+    key_prefix : str
+        widget key 前缀；多个 picker 同页不冲突。
+    auto_trigger : bool, default ``False``
+        True 时：选中 selectbox 选项即返回 (exchange, symbol)，无需点「添加」；
+        同值不重复触发（用 session_state 哨兵去重），清空选项可重新触发。
+        选 True 时会隐藏「添加」按钮（文本输入兜底分支仍保留按钮）。
+        调用方继续用 ``if add_result is not None:`` 接收，职责（写 URL /
+        更新 list / rerun 等）由调用方决定 — 本 picker 不耦合业务。
+
     Returns
     -------
     (exchange, symbol) | None
-        点「添加」时返回 (exchange, symbol)，否则返回 None。
+        点「添加」（手动模式）或选中新值（auto 模式）时返回；
+        否则返回 None。
     """
     c1, c2, c3 = st.columns([1, 2, 1], vertical_alignment="bottom")
     with c1:
@@ -176,7 +216,6 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
     # 根据所选交易所获取 instrument 列表
     if a_exchange == EXCHANGE_ALL:
         add_inst = _get_merged_instruments()
-        actual_exchange = a_exchange  # 后续由 _resolve_exchange 确定具体 exchange
     else:
         add_inst = get_instruments_by_exchange(a_exchange)
 
@@ -186,8 +225,29 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
         else:
             a_symbol = _text_input_fallback(key_prefix)
 
+    has_options = not add_inst.empty
+    show_button = (not auto_trigger) or (not has_options)
     with c3:
-        add_clicked = st.button("添加", key=f"{key_prefix}_add", width="stretch")
+        if show_button:
+            add_clicked = st.button(
+                "添加", key=f"{key_prefix}_add", width="stretch"
+            )
+        else:
+            add_clicked = False
+
+    if auto_trigger and has_options:
+        # 用 session_state 哨兵去重：同值不重复触发；清空则解除以便下次重新选。
+        last_key = f"{key_prefix}_last_auto"
+        raw_sym = (a_symbol or "").strip() if a_symbol else ""
+        if not raw_sym:
+            st.session_state.pop(last_key, None)
+        else:
+            resolved = _resolve_picked(raw_sym, a_exchange, add_inst)
+            if resolved is not None:
+                token = f"{resolved[0]}:{resolved[1]}"
+                if st.session_state.get(last_key) != token:
+                    st.session_state[last_key] = token
+                    return resolved
 
     if add_clicked:
         if not a_symbol:

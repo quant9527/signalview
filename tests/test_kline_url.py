@@ -336,3 +336,127 @@ def test_build_echarts_html_escapes_script_tag() -> None:
     # The dangerous literal from the title must be escaped inside the option JSON.
     assert '"</script><script>alert(1)</script>"' not in html
     assert '"<\\/script><\\/script>"' in html or '"<\\/script><script>alert(1)<\\/script>"' in html
+
+
+# ---------- auto_trigger 行为 ----------
+
+
+def _install_streamlit_stub(monkeypatch, picked: list[str]) -> None:
+    """为 symbol_picker_add_ui 装一个最小 streamlit 桩；picked 控制 selectbox 顺序返回值。"""
+    state: dict[str, object] = {}
+
+    class _ColumnsCtx:
+        def __init__(self, slots):
+            self._slots = slots
+
+        def __enter__(self):
+            return tuple(_Ctx() for _ in range(self._slots))
+
+        def __exit__(self, *exc):
+            return False
+
+    class _Ctx:
+        def __getattr__(self, name):
+            return lambda *a, **k: None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    pick_iter = iter(picked)
+
+    def fake_selectbox(label, *args, **kwargs):
+        if "options" in kwargs and kwargs.get("options"):
+            # exchange selectbox: return first option (or value)
+            return kwargs["options"][0]
+        # symbol selectbox (no `options` or empty options) -> pop test value
+        key = kwargs.get("key", "")
+        if "exchange" in key:
+            return "as_all"
+        if key.endswith("_symbol_select"):
+            try:
+                return next(pick_iter)
+            except StopIteration:
+                return None
+        return None
+
+    def fake_button(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr("streamlit.session_state", state, raising=False)
+    monkeypatch.setattr("streamlit.columns", lambda *a, **k: _ColumnsCtx(3), raising=False)
+    monkeypatch.setattr("streamlit.selectbox", fake_selectbox, raising=False)
+    monkeypatch.setattr("streamlit.button", fake_button, raising=False)
+
+
+def test_auto_trigger_emits_on_each_change(monkeypatch) -> None:
+    """auto_trigger=True：每次 selectbox 选中新值返回一次 tuple，同值不重复。"""
+    import streamlit as _st  # noqa: F401  (确认 import path)
+
+    # 替代成真实的 module attribute stub
+    state: dict[str, object] = {}
+    pick_iter = iter(["sh000300", "sh000300", "881145_电力_dl_DL", "sh000300"])
+
+    def fake_columns(*a, **k):
+        # st.columns([1,2,1]) returns 3 ctxmgrs (one per weight slot).
+        # Implementation unpacks as c1, c2, c3 = st.columns(...).
+        class _W:
+            def __getattr__(self, n): return lambda *a2, **k2: None
+            def __enter__(self): return self
+            def __exit__(self, *e): return False
+
+        # build 3 ctx managers that each enter as a real `with` block
+        weights = a[0] if a else []
+        n = len(weights) if isinstance(weights, (list, tuple)) else (weights or 3)
+        return [_W() for _ in range(n)]  # tuple-like iterator works for unpacking
+
+    def fake_selectbox(label, *args, **kwargs):
+        key = kwargs.get("key", "")
+        if "exchange" in key:
+            # exchange selectbox: always return as_all to keep merged-table path
+            return "as_all"
+        if key.endswith("_symbol_select"):
+            try:
+                return next(pick_iter)
+            except StopIteration:
+                return None
+        return None
+
+    monkeypatch.setattr("streamlit.session_state", state, raising=False)
+    monkeypatch.setattr("streamlit.columns", fake_columns, raising=False)
+    monkeypatch.setattr("streamlit.selectbox", fake_selectbox, raising=False)
+    monkeypatch.setattr("streamlit.button", lambda *a, **k: False, raising=False)
+
+    symbol_picker.get_instruments_by_exchange = (  # type: ignore[assignment]
+        lambda ex: {
+            "as": symbol_picker.pd.DataFrame(),
+            "ths": symbol_picker.pd.DataFrame({
+                "symbol": ["881145_电力_dl_DL"],
+                "name": ["电力"],
+                "alias": [["dl"]],
+            }),
+            "asindex": symbol_picker.pd.DataFrame({
+                "symbol": ["sh000300"],
+                "name": ["沪深300"],
+                "alias": [["hs300"]],
+            }),
+        }.get(ex, symbol_picker.pd.DataFrame())
+    )
+
+    # 第一次：选中 sh000300 → 应 fire
+    r1 = symbol_picker.symbol_picker_add_ui(key_prefix="kfs", auto_trigger=True)
+    assert r1 == ("asindex", "sh000300"), f"got {r1}"
+
+    # 第二次：still sh000300（state 内部仍选中同值）→ dedupe → 不 fire
+    r2 = symbol_picker.symbol_picker_add_ui(key_prefix="kfs", auto_trigger=True)
+    assert r2 is None, f"expected None, got {r2}"
+
+    # 第三次：选中 881145_电力_dl_DL → 换了值，应 fire
+    r3 = symbol_picker.symbol_picker_add_ui(key_prefix="kfs", auto_trigger=True)
+    assert r3 == ("ths", "881145"), f"got {r3}"
+
+    # 第四次：再次切回 sh000300 → 解锁后能 fire
+    r4 = symbol_picker.symbol_picker_add_ui(key_prefix="kfs", auto_trigger=True)
+    assert r4 == ("asindex", "sh000300"), f"got {r4}"

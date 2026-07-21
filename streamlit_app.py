@@ -25,8 +25,7 @@ pages = {
         st.Page("views/main_then_yd.py", title="主→yd", icon="🔗"),
     ],
     "K线": [
-        st.Page("views/kline.py", title="参数设置", icon="🕯️", url_path="kline"),
-        st.Page("views/kline_fullscreen.py", title="K线图表", icon="📈", url_path="kline_fullscreen"),
+        st.Page("views/kline_fullscreen.py", title="K线", icon="🕯️", url_path="kline"),
     ],
     "Review": [
         st.Page("views/overview.py", title="Overview", icon="🏠"),

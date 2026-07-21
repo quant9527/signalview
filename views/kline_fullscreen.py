@@ -11,7 +11,8 @@ from __future__ import annotations
 import os
 import sys
 from datetime import date, timedelta
-from urllib.parse import urlencode
+from html import escape as _html_escape
+from typing import Callable
 
 import pandas as pd
 import streamlit as st
@@ -22,21 +23,37 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import data
 import flight_kline_client as fkc
 import views.kline_charts as kc
-from symbol_picker import SymbolToken, parse_symbol_tokens
+from constants import KLINE_DEFAULT_FREQ, KLINE_FREQ_OPTIONS
+from symbol_picker import (
+    SymbolToken,
+    encode_symbol_token,
+    parse_symbol_tokens,
+    symbol_picker_add_ui,
+    symbol_quick_add_ui,
+)
 
-SYMBOL_CHART_HEIGHT = 600
+SYMBOL_CHART_HEIGHT = 600  # 单标的兜底高度
+
+# 快捷添加的常用标的
+KLINE_QUICK_ADD_PRESETS: list[tuple[str, str]] = [
+    ("asindex", "sh000300"),
+    ("asindex", "sh000001"),
+    ("asindex", "sz399006"),
+    ("asindex", "sh000688"),
+    ("asindex", "sh000852"),
+    ("ths", "883957"),
+]
 
 
 def _symbol_chart_height(chart_count: int) -> int:
-    """根据图表数量动态计算单个图表高度，使多个 symbol 能同时可见。
-
-    按常见 1080p 视口预留 ~110px 给顶部导航、标题和间距后分配高度，
-    同时保证单图不低于 240px 的可读下限。
-    """
+    """根据图表数量动态计算单个图表高度。"""
     if chart_count <= 1:
-        return SYMBOL_CHART_HEIGHT
-    available = 950 - 110
-    return max(240, available // chart_count)
+        return 600
+    if chart_count == 2:
+        return 420
+    if chart_count == 3:
+        return 320
+    return 280
 
 
 def _qp_str(key: str) -> str:
@@ -56,14 +73,71 @@ def _parse_iso_date(s: str) -> date | None:
         return None
 
 
-def _back_href(entries: list[SymbolToken], start_d: date, end_d: date, all_signals: bool) -> str:
-    params = {
-        "symbol": ",".join(e.token for e in entries),
-        "start": start_d.isoformat(),
-        "end": end_d.isoformat(),
-        "all_signals": "1" if all_signals else "0",
-    }
-    return f"kline?{urlencode(params)}"
+def _sync_url_params(
+    entries: list[SymbolToken],
+    start_d: date,
+    end_d: date,
+    all_signals: bool,
+) -> None:
+    """首次加载时把缺失的默认参数回写到 URL，使 URL 始终完整。"""
+    expected_symbol = ",".join(e.token for e in entries) if entries else ""
+    expected_start = start_d.isoformat()
+    expected_end = end_d.isoformat()
+    expected_all = "1" if all_signals else "0"
+
+    cur_symbol = _qp_str("symbol")
+    cur_start = _qp_str("start")
+    cur_end = _qp_str("end")
+    cur_all = _qp_str("all_signals")
+
+    if not entries:
+        if "symbol" in st.query_params:
+            del st.query_params["symbol"]
+        return
+
+    changed = False
+    if cur_symbol != expected_symbol:
+        st.query_params["symbol"] = expected_symbol
+        changed = True
+    if cur_start != expected_start:
+        st.query_params["start"] = expected_start
+        changed = True
+    if cur_end != expected_end:
+        st.query_params["end"] = expected_end
+        changed = True
+    if cur_all != expected_all and expected_all != "1":
+        # 只在关闭 all_signals 时写 "0"；默认 "1" 可省略
+        st.query_params["all_signals"] = expected_all
+        changed = True
+    if changed:
+        st.rerun()
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _build_preset_name_map(
+    presets: tuple[tuple[str, str], ...],
+) -> dict[tuple[str, str], str]:
+    """从 instrument 表查询快捷添加预设的中文名称。"""
+    result: dict[tuple[str, str], str] = {}
+    exchanges = {ex for ex, _ in presets}
+    for ex in exchanges:
+        df = data.get_instruments_by_exchange(ex)
+        if df.empty:
+            continue
+        df = df.copy()
+        df["_sym_lower"] = df["symbol"].astype(str).str.lower()
+        for ex_p, sym_p in presets:
+            if ex_p.lower() != ex.lower():
+                continue
+            match = df[df["_sym_lower"] == sym_p.lower()]
+            if not match.empty:
+                result[(ex_p, sym_p)] = str(match.iloc[0].get("name", ""))
+    return {preset: result.get(preset) or f"{preset[0]}:{preset[1]}" for preset in presets}
+
+
+def _preset_label(exchange: str, symbol: str) -> str:
+    names = _build_preset_name_map(tuple(KLINE_QUICK_ADD_PRESETS))
+    return names.get((exchange, symbol), f"{exchange}:{symbol}")
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -83,6 +157,15 @@ def _build_symbol_name_map(
             if sym and name:
                 result[(ex, sym)] = name
     return result
+
+
+def _symbol_label_func(
+    name_map: dict[tuple[str, str], str],
+) -> Callable[[SymbolToken], str]:
+    """快捷 label 函数：优先中文名，其次 exchange:symbol。"""
+    def label(e: SymbolToken) -> str:
+        return name_map.get((e.exchange, e.symbol)) or f"{e.exchange}:{e.symbol}"
+    return label
 
 
 def _chart_title(token: SymbolToken, name_map: dict[tuple[str, str], str]) -> str:
@@ -174,6 +257,13 @@ def _build_charts(
         signals = kc.map_signals_to_bars(prep, signals_df, chart_freq=signal_freq)
 
         cid = f"ch_{len(metas)}"
+        pct_change_raw = prep.get("pct_change")
+        pct_change_list: list[float | None] | None = None
+        if pct_change_raw is not None and not pct_change_raw.isna().all():
+            pct_change_list = [
+                None if pd.isna(v) else round(float(v), 2)
+                for v in pct_change_raw
+            ]
         charts.append({
             "id": cid,
             "height": chart_height,
@@ -189,26 +279,21 @@ def _build_charts(
                 height=chart_height,
             ),
         })
-        metas[cid] = kc.build_chart_meta(labels, ohlc, ma_lines, signals)
+        metas[cid] = kc.build_chart_meta(labels, ohlc, ma_lines, signals, pct_change_list)
 
     bar_counts = {tok: len(prep) for tok, (prep, _) in sym_data.items()}
     return charts, metas, bar_counts
 
 
 def _redirect_when_empty(raw_symbol: str) -> None:
-    """当 URL 中缺少有效 symbol 参数时，重定向到参数设置页。"""
-    # 直接跳转到 K 线参数设置页，不保留空参数入口
-    st.switch_page("views/kline.py")
-    # switch_page 会中断执行；兜底提示仅在异常场景出现
-    has_raw = bool(raw_symbol)
-    title = "参数格式无效" if has_raw else "缺少 K 线标的参数"
-    st.warning(title)
+    """当 URL 中缺少有效 symbol 参数时，展示空状态引导用户添加。"""
+    st.info("请通过「添加标的」选择至少一个标的，或通过 URL 参数 `symbol` 传入标的。")
     st.stop()
 
 
 def main() -> None:
     st.markdown(
-        "<style>div.block-container{padding-top:1rem;padding-bottom:0.5rem;}</style>",
+        "<style>div.block-container{padding-top:4.5rem;padding-bottom:0.5rem;}</style>",
         unsafe_allow_html=True,
     )
 
@@ -217,8 +302,6 @@ def main() -> None:
 
     raw_symbol = _qp_str("symbol")
     entries = parse_symbol_tokens(raw_symbol)
-    if not entries:
-        _redirect_when_empty(raw_symbol)
 
     start_d = _parse_iso_date(_qp_str("start")) or default_start
     end_d = _parse_iso_date(_qp_str("end")) or default_end
@@ -228,12 +311,126 @@ def main() -> None:
         st.error("开始日期不能晚于结束日期。")
         st.stop()
 
-    st.markdown(
-        f'<a href="{_back_href(entries, start_d, end_d, all_signals)}" '
-        'style="color:#8b949e;text-decoration:none;">← 返回参数设置</a>',
-        unsafe_allow_html=True,
-    )
+    # 首次加载时将默认参数写回 URL
+    _sync_url_params(entries, start_d, end_d, all_signals)
 
+    name_map = _build_symbol_name_map(tuple((e.exchange, e.symbol) for e in entries))
+    _name_of = _symbol_label_func(name_map)
+
+    # ---------- 快捷添加 ----------
+    preset_set = set(KLINE_QUICK_ADD_PRESETS)
+    selected_presets = {
+        (e.exchange, e.symbol) for e in entries
+        if (e.exchange, e.symbol) in preset_set
+    }
+    non_preset_tokens = [
+        e.token for e in entries
+        if (e.exchange, e.symbol) not in preset_set
+    ]
+
+    clicked_preset = symbol_quick_add_ui(
+        KLINE_QUICK_ADD_PRESETS,
+        label_func=_preset_label,
+        selected=selected_presets,
+        key_prefix="kfs_quick",
+    )
+    if clicked_preset is not None:
+        ex, sym = clicked_preset
+        if (ex, sym) in selected_presets:
+            new_presets = selected_presets - {(ex, sym)}
+        else:
+            new_presets = selected_presets | {(ex, sym)}
+        default_freq = entries[0].freq if entries else KLINE_DEFAULT_FREQ
+        preset_tokens = [
+            encode_symbol_token(ex_p, sym_p, default_freq)
+            for ex_p, sym_p in new_presets
+        ]
+        st.query_params["symbol"] = ",".join([*non_preset_tokens, *preset_tokens])
+        st.rerun()
+
+    # ---------- 搜索添加 ----------
+    add_result = symbol_picker_add_ui(key_prefix="kfs_add")
+    if add_result is not None:
+        ex, sym = add_result
+        default_freq = entries[0].freq if entries else KLINE_DEFAULT_FREQ
+        new_token = encode_symbol_token(ex, sym, default_freq)
+        if new_token not in {e.token for e in entries}:
+            st.query_params["symbol"] = ",".join(
+                e.token for e in [*entries, SymbolToken(ex, sym, default_freq)]
+            )
+            st.rerun()
+
+    if not entries:
+        _redirect_when_empty(raw_symbol)
+
+    # ---------- 标的控制栏（freq pills + 删除）----------
+    freq_changed = False
+    removed_idx: int | None = None
+    for i, e in enumerate(entries):
+        label = _name_of(e)
+        c1, c2, c3 = st.columns([2, 7, 1], vertical_alignment="center")
+        with c1:
+            c1.markdown(
+                f"<span style='white-space:nowrap;'>{_html_escape(label)}</span>",
+                unsafe_allow_html=True,
+            )
+        with c2:
+            new_freq = st.pills(
+                f"周期_{i}",
+                options=list(KLINE_FREQ_OPTIONS),
+                default=e.freq if e.freq in KLINE_FREQ_OPTIONS else KLINE_FREQ_OPTIONS[0],
+                key=f"kfs_freq_pills_{i}",
+                label_visibility="collapsed",
+            )
+            if new_freq and new_freq != e.freq:
+                freq_changed = True
+                entries[i] = SymbolToken(e.exchange, e.symbol, new_freq, e.reverse)
+        with c3:
+            if st.button("✕", key=f"kfs_rm_{i}", type="tertiary", help=f"移除 {label}"):
+                removed_idx = i
+
+    if removed_idx is not None:
+        new_entries = [e for i, e in enumerate(entries) if i != removed_idx]
+        if new_entries:
+            st.query_params["symbol"] = ",".join(e.token for e in new_entries)
+        elif "symbol" in st.query_params:
+            del st.query_params["symbol"]
+        st.rerun()
+    if freq_changed:
+        st.query_params["symbol"] = ",".join(e.token for e in entries)
+        st.rerun()
+
+    # ---------- 日期 & 信号设置 ----------
+    c_d1, c_d2, c_sig = st.columns([2, 2, 3], vertical_alignment="center", gap="small")
+    with c_d1:
+        start_input = st.date_input("开始日期", value=start_d, key="kfs_start")
+    with c_d2:
+        end_input = st.date_input("结束日期", value=end_d, key="kfs_end")
+    with c_sig:
+        all_signals_input = st.checkbox(
+            "显示全部周期信号",
+            value=all_signals,
+            key="kfs_all_signals",
+            help="开启后叠加所有周期（15m/30m/1h/1d/1w）的买卖信号",
+        )
+
+    if start_input > end_input:
+        st.error("开始日期不能晚于结束日期。")
+        st.stop()
+
+    date_or_signal_changed = (
+        start_input != start_d
+        or end_input != end_d
+        or all_signals_input != all_signals
+    )
+    if date_or_signal_changed:
+        st.query_params["start"] = start_input.isoformat()
+        st.query_params["end"] = end_input.isoformat()
+        st.query_params["all_signals"] = "1" if all_signals_input else "0"
+        st.rerun()
+
+    # ---------- 数据拉取 ----------
+    st.divider()
     start_ms = int(pd.Timestamp(start_d, tz="Asia/Shanghai").timestamp() * 1000)
     end_ms = int(pd.Timestamp(end_d, tz="Asia/Shanghai").replace(hour=23, minute=59, second=59).timestamp() * 1000)
     flight_url = kc.resolve_flight_url()

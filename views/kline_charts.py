@@ -67,19 +67,17 @@ def symbol_key_from_tags(tags: list[str]) -> str | None:
     return parts[1].lower()
 
 
-def _pick_col(df: pd.DataFrame, *candidates: str) -> str | None:
-    lower_map = {str(c).lower(): c for c in df.columns}
-    for name in candidates:
-        if name.lower() in lower_map:
-            return lower_map[name.lower()]
-    return None
+def _col(df: pd.DataFrame, name: str) -> str | None:
+    """Return *name* if it exists in *df*, else None."""
+    return name if name in df.columns else None
 
 
 def _find_ma_columns(df: pd.DataFrame) -> list[str]:
+    """Flight schema: ma5, ma10, ma20, ma60, ma120, ma250."""
     found: list[tuple[int, str]] = []
     for c in df.columns:
         lc = str(c).strip().lower()
-        m = re.fullmatch(r"ma_?(\d+)", lc)
+        m = re.fullmatch(r"ma(\d+)", lc)
         if m:
             found.append((int(m.group(1)), c))
     found.sort(key=lambda x: x[0])
@@ -87,46 +85,21 @@ def _find_ma_columns(df: pd.DataFrame) -> list[str]:
 
 
 def _find_macd_columns(df: pd.DataFrame) -> dict[str, str]:
+    """Flight schema: macd (histogram), dif, dea."""
     lm = {str(c).lower().strip(): c for c in df.columns}
     roles: dict[str, str] = {}
-
-    # Case 1: Chinese-style naming — "macd" is the histogram/bar, "dif"/"dea" are lines.
-    has_dif = any(k in lm for k in ("macd_dif", "dif", "macd_diff", "diff"))
-    has_dea = any(k in lm for k in ("macd_dea", "dea"))
-    if has_dif and has_dea and "macd" in lm:
-        for k in ("macd_dif", "dif", "macd_diff", "diff"):
-            if k in lm:
-                roles["dif"] = lm[k]
-                break
-        for k in ("macd_dea", "dea"):
-            if k in lm:
-                roles["dea"] = lm[k]
-                break
+    if "macd" in lm and "dif" in lm and "dea" in lm:
         roles["hist"] = lm["macd"]
+        roles["dif"] = lm["dif"]
+        roles["dea"] = lm["dea"]
         return roles
-
-    # Case 2: TA-Lib style naming — "macd"=DIF line, "macdsignal"=DEA line, "macdhist"=bar.
+    # Fallback: TA-Lib style naming (non-Flight data sources)
     if "macd" in lm and "macdsignal" in lm:
         roles["dif"] = lm["macd"]
         roles["dea"] = lm["macdsignal"]
         if "macdhist" in lm:
             roles["hist"] = lm["macdhist"]
         return roles
-
-    # Fallback: fuzzy-match individual roles.
-    for k in ("macd_dif", "dif", "diff", "macd_diff", "macdline", "macd_line"):
-        if k in lm:
-            roles["dif"] = lm[k]
-            break
-    for k in ("macd_dea", "dea", "signal", "macd_signal"):
-        if k in lm:
-            roles["dea"] = lm[k]
-            break
-    for k in ("macd_hist", "macd_bar", "histogram", "hist", "macdhist", "macd_osc"):
-        if k in lm:
-            roles["hist"] = lm[k]
-            break
-
     return roles
 
 
@@ -134,13 +107,13 @@ def _prepare_kline_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, dict] | None:
     """解析时间、OHLC、成交量、均线、MACD；返回排序后的表与元信息。"""
     if df.empty:
         return None
-    ts_col = _pick_col(df, "end_ts", "timestamp", "datetime")
+    ts_col = _col(df, "end_ts") or _col(df, "timestamp")
     if ts_col is None:
         return None
-    o = _pick_col(df, "open", "Open")
-    h = _pick_col(df, "high", "High")
-    lo = _pick_col(df, "low", "Low")
-    c = _pick_col(df, "close", "Close")
+    o = _col(df, "open")
+    h = _col(df, "high")
+    lo = _col(df, "low")
+    c = _col(df, "close")
     if c is None:
         return None
 
@@ -164,7 +137,7 @@ def _prepare_kline_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, dict] | None:
     if "low" not in out.columns:
         out["low"] = out["close"]
 
-    vol_src = _pick_col(out, "volume", "Volume", "vol", "Vol")
+    vol_src = _col(out, "vol")
     has_volume = vol_src is not None
     if has_volume:
         out["volume"] = pd.to_numeric(out[vol_src], errors="coerce")
@@ -183,12 +156,17 @@ def _prepare_kline_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, dict] | None:
         out[key] = pd.to_numeric(out[src], errors="coerce")
         macd_plot[role] = key
 
+    has_pct_change = "pct_change" in out.columns
+    if has_pct_change:
+        out["pct_change"] = pd.to_numeric(out["pct_change"], errors="coerce")
+
     out = out.dropna(subset=["_x", "close"]).sort_values("_x")
 
     meta = {
         "has_volume": has_volume,
         "ma_cols": ma_plot,
         "macd": macd_plot,
+        "has_pct_change": has_pct_change,
     }
     return out, meta
 
@@ -407,8 +385,9 @@ def build_chart_meta(
     ohlc: list[list[float]],
     ma_lines: list[dict[str, Any]],
     signals: list[dict],
+    pct_change: list[float | None] | None = None,
 ) -> dict:
-    """固定 tooltip 所需的每图数据：日期、K 线、均线、按 bar 聚合的信号。"""
+    """固定 tooltip 所需的每图数据：日期、K 线、均线、按 bar 聚合的信号、涨跌幅。"""
     sig_by_idx: dict[int, list[dict]] = {}
     for sig in signals:
         kind = sig.get("kind")
@@ -422,12 +401,15 @@ def build_chart_meta(
             "strength": sig["score"],
             "reason": sig["reason"],
         })
-    return {
+    meta: dict[str, Any] = {
         "dates": labels,
         "kline": ohlc,
         "mas": ma_lines,
         "signals": sig_by_idx,
     }
+    if pct_change is not None:
+        meta["pct_change"] = pct_change
+    return meta
 
 
 # ===========================================================
@@ -693,6 +675,11 @@ function klineAxisTip(params, meta){
         maParts.push('<span style="color:'+ma.color+'">'+ma.name+'</span>'+Number(v).toFixed(2));
     });
     if(maParts.length) html+=sep+maParts.join(sep);
+    var pct=meta.pct_change&&meta.pct_change[di];
+    if(pct!=null){
+        var pctClass=pct>=0?'color:'+UP:'color:'+DOWN;
+        html+=sep+'<span style="'+pctClass+'">'+esc((pct>=0?'+':'')+Number(pct).toFixed(2)+'%')+'</span>';
+    }
     var sigs=meta.signals[di]||[];
     sigs.forEach(function(s){
         var c=s.type==='BUY'?UP:DOWN;

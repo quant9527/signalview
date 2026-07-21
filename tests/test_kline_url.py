@@ -9,7 +9,14 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from symbol_picker import SymbolToken, encode_symbol_token, parse_symbol_tokens
+from symbol_picker import (
+    SymbolToken,
+    _clean_symbol_code,
+    _get_merged_instruments,
+    encode_symbol_token,
+    parse_symbol_tokens,
+)
+import symbol_picker
 from views.kline_charts import (
     _build_signal_arrow_series,
     build_chart_meta,
@@ -60,6 +67,97 @@ def test_parse_garbage_skipped_and_freq_fixed() -> None:
 def test_parse_empty() -> None:
     assert parse_symbol_tokens("") == []
     assert parse_symbol_tokens(None) == []
+
+
+# ---------- symbol 清洗 / 合并 instrument ----------
+
+
+def test_clean_symbol_code_strips_suffix() -> None:
+    """Instrument 表的 symbol 形如 881145_电力_dl_DL，提取 6 位代码。"""
+    assert _clean_symbol_code("881145_电力_dl_DL") == "881145"
+    assert _clean_symbol_code("600519") == "600519"
+    assert _clean_symbol_code("sh000300") == "sh000300"
+
+
+def test_clean_symbol_code_does_not_strip_exchange_prefix() -> None:
+    """重构后不再从合并表中剥离 exchange_ 前缀；统一由 _source_exchange 解析。"""
+    assert _clean_symbol_code("asindex_sh000300") == "asindex_sh000300"
+    assert _clean_symbol_code("ths_881145") == "ths_881145"
+
+
+def test_merged_instruments_keeps_raw_symbols() -> None:
+    """_get_merged_instruments 必须保留原始 symbol，不做 exchange_ 前缀拼接。
+
+    替换 get_instruments_by_exchange stub：
+    - as 返回空
+    - ths 含 ths 表典型后缀格式
+    - asindex 含指数代码
+    """
+    symbol_picker.get_instruments_by_exchange = (  # type: ignore[assignment]
+        lambda ex: {
+            "ths": pd.DataFrame({
+                "symbol": ["881145_电力_dl_DL"],
+                "name": ["电力"],
+                "alias": [["dl", "DL"]],
+            }),
+            "asindex": pd.DataFrame({
+                "symbol": ["sh000300"],
+                "name": ["沪深300"],
+                "alias": [["hs300"]],
+            }),
+        }.get(ex, pd.DataFrame())
+    )
+    merged = _get_merged_instruments()
+    assert set(merged["symbol"].tolist()) == {"881145_电力_dl_DL", "sh000300"}
+    assert "_source_exchange" in merged.columns
+    src = dict(zip(merged["symbol"], merged["_source_exchange"]))
+    assert src["881145_电力_dl_DL"] == "ths"
+    assert src["sh000300"] == "asindex"
+    # 必须没有前缀拼接
+    assert "asindex_sh000300" not in merged["symbol"].tolist()
+    assert "ths_881145_电力_dl_DL" not in merged["symbol"].tolist()
+
+
+def test_parse_preserves_underscore_in_symbol() -> None:
+    """解析器不再剥离前缀，符号中的下划线被原样保留。"""
+    tokens = parse_symbol_tokens("as:asindex_sh000300:1d")
+    assert tokens == [SymbolToken("as", "asindex_sh000300", "1d", False)]
+
+
+def test_parse_asindex_canonical_roundtrip() -> None:
+    """asindex:sh000300:1d canonical token 双向 OK。"""
+    tokens = parse_symbol_tokens("asindex:sh000300:1d")
+    assert tokens == [SymbolToken("asindex", "sh000300", "1d", False)]
+    raw = "asindex:sh000300:1d"
+    assert ",".join(t.token for t in tokens) == raw
+
+
+def test_alias_pipeline_drops_per_row_overlap() -> None:
+    """重构后用 explode + groupby 聚合 alias：每行 alias 与该行 symbol/name（精确字符串）相等则丢弃。
+
+    保留：
+    - gzmt（不与 symbol=600519 或 name=贵州茅台 相等）
+    - 茅台（同理不与 name 严格相等）
+    - byd（同理）
+
+    丢弃：
+    - 比亚迪（与 name 严格相等）
+    - 002594（与 symbol 严格相等）
+    """
+    df = pd.DataFrame({
+        "symbol": ["600519", "002594"],
+        "name": ["贵州茅台", "比亚迪"],
+        "alias": [["gzmt", "茅台"], ["byd", "比亚迪", "002594"]],
+    })
+    long = df[["symbol", "name", "alias"]].copy().assign(_alias=df["alias"]).explode("_alias")
+    long["_alias"] = long["_alias"].astype(str)
+    keep = (long["_alias"].str.lower() != long["symbol"].astype(str).str.lower()) & (
+        long["_alias"].str.lower() != long["name"].astype(str).str.lower()
+    )
+    filtered = long[keep]
+    agg = filtered.groupby("symbol", sort=False)["_alias"].agg("_".join)
+    assert agg["600519"] == "gzmt_茅台"
+    assert agg["002594"] == "byd"
 
 
 # ---------- 信号字段映射 ----------

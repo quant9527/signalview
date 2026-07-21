@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, NamedTuple
 
+import pandas as pd
 import streamlit as st
 
 from constants import KLINE_DEFAULT_FREQ, KLINE_EXCHANGE_OPTIONS, KLINE_FREQ_SET
@@ -47,16 +48,105 @@ def parse_symbols_with_exchange(
 
 
 def _clean_symbol_code(sym: str) -> str:
-    """去掉 instrument 表中 symbol 列的后缀元数据，只保留纯代码。
+    """去掉 instrument 表的后缀元数据，只保留纯代码。
 
     某些 instrument 表的 symbol 列存储格式为 "代码_名称_拼音别名"（如
-    "881145_电力_dl_DL"），而 Flight 查询只需要纯代码。
+    "881145_电力_dl_DL"），而 Flight 查询只需要纯代码 6 位数字代码。
     """
-    if "_" in sym:
-        prefix = sym.split("_", 1)[0]
-        if prefix.isdigit() and len(prefix) == 6:
-            return prefix
+    parts = sym.split("_")
+    if len(parts) >= 2 and parts[0].isdigit() and len(parts[0]) == 6:
+        return parts[0]
     return sym
+
+
+# 合集交易所：as + ths + asindex
+EXCHANGE_ALL = "as_all"
+_EXCHANGE_WITH_ALL = (EXCHANGE_ALL,) + KLINE_EXCHANGE_OPTIONS
+# _get_merged_instruments 内部使用的三个数据源交易所；不参与前缀解析
+_MERGED_SOURCES: tuple[str, ...] = ("as", "ths", "asindex")
+
+
+def _get_merged_instruments() -> pd.DataFrame:
+    """获取 as_all（as + ths + asindex）的合并 instrument 列表。
+
+    symbol 列保持 raw 原始值，_source_exchange 列携带来源交易所，
+    供调用方通过 _source_exchange 还原 symbol 所属交易所。
+    """
+    dfs: list[pd.DataFrame] = []
+    for ex in _MERGED_SOURCES:
+        df = get_instruments_by_exchange(ex)
+        if not df.empty:
+            dfs.append(df.assign(_source_exchange=ex))
+    if not dfs:
+        return pd.DataFrame()
+    merged = pd.concat(dfs, ignore_index=True)
+    merged = merged.drop_duplicates(subset=["symbol"], keep="first")
+    return merged
+
+
+def _selectbox_or_search(
+    add_inst: pd.DataFrame,
+    key_prefix: str,
+) -> str:
+    """可打字的 symbol 搜索：selectbox 内搜索，先清空后搜索。
+
+    使用 index=None 让 selectbox 默认为空，用户输入时直接搜索，
+    不会被上一次的值干扰。
+    """
+    sym_list = sorted(add_inst["symbol"].tolist())
+    name_map: dict[str, Any] = dict(
+        zip(add_inst["symbol"], add_inst["name"], strict=False)
+    )
+    alias_map: dict[str, str] = {}
+    if "alias" in add_inst.columns:
+        # explode aliases to long-form, 过滤掉与 该行 symbol/name 重复的项，再聚合。
+        long = (
+            add_inst[["symbol", "name", "alias"]]
+            .copy()
+            .assign(_alias=add_inst["alias"])
+            .explode("_alias")
+        )
+        long["_alias"] = long["_alias"].astype(str)
+        _alias_low = long["_alias"].str.lower()
+        _sym_low = long["symbol"].astype(str).str.lower()
+        _nam_low = (
+            long["name"].astype(str).str.lower()
+            if "name" in long.columns
+            else pd.Series([""] * len(long), index=long.index)
+        )
+        # 元素级比较，避免 isin 在多行情况下错位
+        keep = (_alias_low != _sym_low) & (_alias_low != _nam_low)
+        long = long[keep]
+        if not long.empty:
+            agg = (
+                long.groupby("symbol", sort=False)["_alias"]
+                .agg("_".join)
+            )
+            alias_map = {k: v for k, v in agg.items() if v}
+
+    return st.selectbox(
+        "代码",
+        options=sym_list,
+        index=None,
+        format_func=lambda s: (
+            f"{s}"
+            + (f"_{name_map.get(s, '')}" if name_map.get(s, "") else "")
+            + (f"_{alias_map.get(s, '')}" if alias_map.get(s) else "")
+        ),
+        key=f"{key_prefix}_symbol_select",
+        label_visibility="collapsed",
+        placeholder="输入代码或名称搜索...",
+    )
+
+
+def _text_input_fallback(key_prefix: str) -> str:
+    """当 instrument 表无数据时的纯文本输入兜底。"""
+    return st.text_input(
+        "代码",
+        key=f"{key_prefix}_symbol_input",
+        placeholder="600519 / sh000300 / BTC",
+        label_visibility="collapsed",
+    )
 
 
 def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
@@ -65,73 +155,58 @@ def symbol_picker_add_ui(key_prefix: str = "sp") -> tuple[str, str] | None:
 
     下拉选项包含「代码  名称  [别名]」，alias 中包含拼音首字母，
     Streamlit 自带搜索可直接匹配（如输入"jfy"找到"减肥药"）。
+    symbol selectbox 使用 index=None，输入即搜索，不会被旧值干扰。
 
     Returns
     -------
     (exchange, symbol) | None
-        点「＋ 添加」时返回 (exchange, symbol)，否则返回 None。
+        点「添加」时返回 (exchange, symbol)，否则返回 None。
     """
     c1, c2, c3 = st.columns([1, 2, 1], vertical_alignment="bottom")
     with c1:
         a_exchange: str = st.selectbox(
             "交易所",
-            options=list(KLINE_EXCHANGE_OPTIONS),
+            options=list(_EXCHANGE_WITH_ALL),
+            index=list(_EXCHANGE_WITH_ALL).index(EXCHANGE_ALL),
             key=f"{key_prefix}_exchange",
             label_visibility="collapsed",
             placeholder="交易所",
         )
 
-    add_inst = get_instruments_by_exchange(a_exchange)
+    # 根据所选交易所获取 instrument 列表
+    if a_exchange == EXCHANGE_ALL:
+        add_inst = _get_merged_instruments()
+        actual_exchange = a_exchange  # 后续由 _resolve_exchange 确定具体 exchange
+    else:
+        add_inst = get_instruments_by_exchange(a_exchange)
+
     with c2:
         if not add_inst.empty:
-            sym_list = sorted(add_inst["symbol"].tolist())
-            name_map: dict[str, Any] = dict(
-                zip(add_inst["symbol"], add_inst["name"], strict=False)
-            )
-            if "alias" in add_inst.columns:
-                alias_map: dict[str, str] = {}
-                for _, row in add_inst.iterrows():
-                    aliases = row.get("alias")
-                    if isinstance(aliases, (list, tuple)):
-                        sym_low = str(row["symbol"]).lower()
-                        nam_low = str(row.get("name", "")).lower()
-                        extra = [
-                            str(a)
-                            for a in aliases
-                            if str(a).lower() not in (sym_low, nam_low)
-                        ]
-                        if extra:
-                            alias_map[row["symbol"]] = "_".join(extra)
-            else:
-                alias_map = {}
-
-            a_symbol: str = st.selectbox(
-                "代码",
-                options=sym_list,
-                format_func=lambda s: (
-                    f"{s}"
-                    + (f"_{name_map.get(s, '')}" if name_map.get(s, "") else "")
-                    + (f"_{alias_map.get(s, '')}" if alias_map.get(s) else "")
-                ),
-                key=f"{key_prefix}_symbol_select",
-                label_visibility="collapsed",
-                placeholder="代码",
-            )
+            a_symbol = _selectbox_or_search(add_inst, key_prefix)
         else:
-            a_symbol = st.text_input(
-                "代码",
-                key=f"{key_prefix}_symbol_input",
-                placeholder="600519 / sh000300 / BTC",
-                label_visibility="collapsed",
-            )
+            a_symbol = _text_input_fallback(key_prefix)
 
     with c3:
         add_clicked = st.button("添加", key=f"{key_prefix}_add", width="stretch")
 
     if add_clicked:
-        sym_val = _clean_symbol_code(str(a_symbol).strip())
+        if not a_symbol:
+            return None
+        raw_sym = str(a_symbol).strip()
+        # symbol 现在已是 raw 值（合并表不再前缀化），但 instrument 表
+        # 仍可能带 "代码_名称_拼音别名" 后缀；该 helper 只清后缀。
+        sym_val = _clean_symbol_code(raw_sym)
         if sym_val:
-            return (a_exchange, sym_val)
+            # 如果是 as_all，从合并表中找到该 symbol 的实际 exchange
+            if a_exchange == EXCHANGE_ALL and not add_inst.empty:
+                matched = add_inst[add_inst["symbol"].astype(str).str.strip() == raw_sym]
+                if not matched.empty:
+                    actual_exchange = str(matched.iloc[0].get("_source_exchange", a_exchange))
+                else:
+                    actual_exchange = "as"
+            else:
+                actual_exchange = a_exchange
+            return (actual_exchange, sym_val)
     return None
 
 

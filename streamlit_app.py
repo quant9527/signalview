@@ -1,60 +1,91 @@
+"""Streamlit entrypoint: registers 8 sections / 24 pages under app_pages/."""
+from __future__ import annotations
+
 import streamlit as st
 
 from reports_server import start_reports_server
 
-# Start a local read-only HTTP server for backtest report HTML files
+# Pages are imported for their module-level `page_<name>()` callables.
+from app_pages.active_vol_then_nestedbc import page_active_vol_then_nestedbc
+from app_pages.alert_rule_crud import page_alert_rule_crud
+from app_pages.all_signals_by_symbol import page_all_signals_by_symbol
+from app_pages.backtest_reports import page_backtest_reports
+from app_pages.dashboard_as import page_dashboard_as
+from app_pages.dashboard_binance import page_dashboard_binance
+from app_pages.dashboard_em import page_dashboard_em
+from app_pages.instrument_groups import page_instrument_groups
+from app_pages.kline import page_kline
+from app_pages.kline_fullscreen import page_kline_fullscreen
+from app_pages.main_then_yd import page_main_then_yd
+from app_pages.ml_scores import page_ml_scores
+from app_pages.nested_bc import page_nested_bc
+from app_pages.overview import page_overview
+from app_pages.performance import page_performance
+from app_pages.profit_pattern_cl3b_zsx import page_profit_pattern_cl3b_zsx
+from app_pages.review_em import page_review_em
+from app_pages.review_hotspot import page_review_hotspot
+from app_pages.review_index import page_review_index
+from app_pages.review_key import page_review_key
+from app_pages.review_today import page_review_today
+from app_pages.search_signals import page_search_signals
+from app_pages.sector_signals import page_sector_signals
+from app_pages.today_opportunities import page_today_opportunities
+
 start_reports_server()
 
-# Configure the page to use wide layout
-st.set_page_config(layout="wide")
-
-# Define pages structure for top navigation
-pages = {
+pages: dict[str, list[st.StreamlitPage]] = {
     "Dashboard": [
-        st.Page("views/dashboard_as.py", title="AS", icon="🇨🇳"),
-        st.Page("views/dashboard_binance.py", title="Binance", icon="🪙"),
-        st.Page("views/dashboard_em.py", title="EM", icon="🌍"),
+        st.Page(page_dashboard_as,      title="AS",      icon="🇨🇳", url_path="dashboard_as"),
+        st.Page(page_dashboard_binance, title="Binance", icon="🪙",  url_path="dashboard_binance"),
+        st.Page(page_dashboard_em,      title="EM",      icon="🌍", url_path="dashboard_em"),
     ],
     "AS": [
-        st.Page("views/today_opportunities.py", title="今日机会", icon="🎯", default=True),
-        st.Page("views/review_index.py", title="大盘", icon="📈"),
-        st.Page("views/review_hotspot.py", title="板块热点", icon="🔥"),
-        st.Page("views/active_vol_then_nestedbc.py", title="active_vol_then_nestedbc", icon="📉"),
-        st.Page("views/nested_bc.py", title="nested_bc", icon="📊"),
-        st.Page("views/profit_pattern_cl3b_zsx.py", title="CL3B ZSX", icon="📈"),
-        st.Page("views/main_then_yd.py", title="主→yd", icon="🔗"),
+        st.Page(page_today_opportunities, title="今日机会", icon="🎯",
+                url_path="today_opportunities", default=True),
+        st.Page(page_review_index,            title="大盘",     icon="📈", url_path="review_index"),
+        st.Page(page_review_hotspot,          title="板块热点", icon="🔥", url_path="review_hotspot"),
+        st.Page(page_active_vol_then_nestedbc, title="active_vol_then_nestedbc",
+                icon="📉", url_path="active_vol_then_nestedbc"),
+        st.Page(page_nested_bc,               title="nested_bc", icon="📊", url_path="nested_bc"),
+        st.Page(page_profit_pattern_cl3b_zsx, title="CL3B ZSX",  icon="📈",
+                url_path="profit_pattern_cl3b_zsx"),
+        st.Page(page_main_then_yd,            title="主→yd",      icon="🔗", url_path="main_then_yd"),
     ],
     "K线": [
-        st.Page("views/kline.py", title="K线", icon="🕯️", url_path="kline"),
+        st.Page(page_kline,            title="K线",     icon="🕯️", url_path="kline"),
+        st.Page(page_kline_fullscreen, title="K线全屏", icon="📈", url_path="kline_fullscreen"),
     ],
     "Review": [
-        st.Page("views/overview.py", title="Overview", icon="🏠"),
-        st.Page("views/review_today.py", title="Today Review", icon="📋"),
-        st.Page("views/review_em.py", title="EM Review", icon="📋"),
-        st.Page("views/review_key.py", title="Key Review", icon="⭐"),
+        st.Page(page_overview,    title="Overview",     icon="🏠", url_path="overview"),
+        st.Page(page_review_today, title="Today Review", icon="📋", url_path="review_today"),
+        st.Page(page_review_em,    title="EM Review",    icon="📋", url_path="review_em"),
+        st.Page(page_review_key,   title="Key Review",   icon="⭐", url_path="review_key"),
     ],
     "Reports": [
-        st.Page("views/backtest_reports.py", title="Backtest Reports", icon="📈"),
+        st.Page(page_backtest_reports, title="Backtest Reports", icon="📈",
+                url_path="backtest_reports"),
     ],
     "Performance": [
-        st.Page("views/performance.py", title="Performance", icon="📊"),
+        st.Page(page_performance, title="Performance", icon="📊", url_path="performance"),
     ],
     "Signals": [
-        st.Page("views/all_signals_by_symbol.py", title="All Signals by Symbol", icon="📊"),
-        st.Page("views/sector_signals.py", title="Sector Signals", icon="🏢"),
-        st.Page("views/search_signals.py", title="Search Signals", icon="🔍"),
+        st.Page(page_all_signals_by_symbol, title="All Signals by Symbol", icon="📊",
+                url_path="all_signals_by_symbol"),
+        st.Page(page_sector_signals,         title="Sector Signals",        icon="🏢",
+                url_path="sector_signals"),
+        st.Page(page_search_signals,         title="Search Signals",        icon="🔍",
+                url_path="search_signals"),
     ],
     "Tools": [
-        st.Page("views/instrument_groups.py", title="Instrument Groups", icon="📁"),
-        st.Page("views/alert_rule_crud.py", title="Alert Rules", icon="🔔"),
+        st.Page(page_instrument_groups, title="Instrument Groups", icon="📁",
+                url_path="instrument_groups"),
+        st.Page(page_alert_rule_crud,   title="Alert Rules",      icon="🔔",
+                url_path="alert_rule_crud"),
     ],
     "ML": [
-        st.Page("views/ml_scores.py", title="ML Scores", icon="🤖"),
+        st.Page(page_ml_scores, title="ML Scores", icon="🤖", url_path="ml_scores"),
     ],
 }
 
-# Run navigation with top position
 pg = st.navigation(pages, position="top")
-
-# Run the selected page
 pg.run()

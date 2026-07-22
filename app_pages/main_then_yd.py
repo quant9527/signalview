@@ -1,7 +1,10 @@
-"""主信号先于 YD：同一标的在时间窗口内先出现主类信号、后出现 YD 类信号。"""
+"""主信号先于 YD page (url_path=main_then_yd)."""
+from __future__ import annotations
 
 import bisect
+
 import pandas as pd
+
 import streamlit as st
 
 from signal_constants import CL3B_ZSX_PREFIX
@@ -96,69 +99,84 @@ def build_main_then_yd_table(
     return res.sort_values(sort_cols, ascending=[False, True, True]).reset_index(drop=True)
 
 
-st.header("📌 主 → yd")
-st.markdown(
-    """
+def page_main_then_yd() -> None:
+    """Main signal precedes YD page (url_path=main_then_yd)."""
+    st.set_page_config(layout="wide", page_title="主 → yd")
+    st.header("📌 主 → yd")
+    st.markdown(
+        """
 在同一时间窗口内，筛选 **同一标的** 上 **先出现主信号、后出现 yd 信号** 的情形（按 `signal_date` 比较；主信号时间须 **严格早于** yd 时间）。
 
 默认名称范围与现有 AS 常用系列一致，可在下方改为前缀或任意子串（「包含」模式）。
 """
-)
+    )
 
-df_full = get_cached_data(45)
-df = df_full.copy()
-if df.empty:
-    st.warning("暂无数据")
-    st.stop()
+    df_full = get_cached_data(45)
+    df = df_full.copy()
+    if df.empty:
+        st.warning("暂无数据")
+        st.stop()
 
-if "signal_date" not in df.columns:
-    st.error("数据中缺少 signal_date")
-    st.stop()
+    if "signal_date" not in df.columns:
+        st.error("数据中缺少 signal_date")
+        st.stop()
 
-df = df.copy()
-df["signal_date"] = pd.to_datetime(df["signal_date"])
-min_date = df["signal_date"].min().date()
-max_date = df["signal_date"].max().date()
-unique_dates = sorted(df["signal_date"].dt.date.unique(), reverse=True)
-default_start = unique_dates[min(4, len(unique_dates) - 1)] if unique_dates else min_date
+    df = df.copy()
+    df["signal_date"] = pd.to_datetime(df["signal_date"])
+    min_date = df["signal_date"].min().date()
+    max_date = df["signal_date"].max().date()
+    unique_dates = sorted(df["signal_date"].dt.date.unique(), reverse=True)
+    default_start = (
+        unique_dates[min(4, len(unique_dates) - 1)] if unique_dates else min_date
+    )
 
-date_range = st.slider(
-    "选择信号日期范围",
-    min_value=min_date,
-    max_value=max_date,
-    value=(default_start, max_date),
-    format="YYYY-MM-DD",
-)
-df = df[
-    (df["signal_date"].dt.date >= date_range[0]) & (df["signal_date"].dt.date <= date_range[1])
-].copy()
-_dates_in_win = df["signal_date"].dt.date.nunique() if not df.empty else 0
-st.info(f"📅 {date_range[0]} 至 {date_range[1]}（窗口内 {_dates_in_win} 个有信号的日历日）")
+    date_range = st.slider(
+        "选择信号日期范围",
+        min_value=min_date,
+        max_value=max_date,
+        value=(default_start, max_date),
+        format="YYYY-MM-DD",
+    )
+    df = df[
+        (df["signal_date"].dt.date >= date_range[0])
+        & (df["signal_date"].dt.date <= date_range[1])
+    ].copy()
+    _dates_in_win = df["signal_date"].dt.date.nunique() if not df.empty else 0
+    st.info(
+        f"📅 {date_range[0]} 至 {date_range[1]}"
+        f"（窗口内 {_dates_in_win} 个有信号的日历日）"
+    )
 
-st.subheader("信号名称范围")
-c1, c2, c3 = st.columns([2, 2, 1])
-with c1:
-    main_default = CL3B_ZSX_PREFIX
-    main_pattern = st.text_input("主信号（名称前缀或子串）", value=main_default)
-with c2:
-    yd_default = "cmp_xsx"
-    yd_pattern = st.text_input("yd（名称前缀或子串）", value=yd_default)
-with c3:
-    match_mode = st.radio("匹配方式", ("前缀", "包含"), horizontal=True)
+    st.subheader("信号名称范围")
+    c1, c2, c3 = st.columns([2, 2, 1])
+    with c1:
+        main_default = CL3B_ZSX_PREFIX
+        main_pattern = st.text_input(
+            "主信号（名称前缀或子串）", value=main_default,
+        )
+    with c2:
+        yd_default = "cmp_xsx"
+        yd_pattern = st.text_input(
+            "yd（名称前缀或子串）", value=yd_default,
+        )
+    with c3:
+        match_mode = st.radio("匹配方式", ("前缀", "包含"), horizontal=True)
 
-if not main_pattern.strip() or not yd_pattern.strip():
-    st.warning("请填写主信号与 yd 的名称范围。")
-    st.stop()
+    if not main_pattern.strip() or not yd_pattern.strip():
+        st.warning("请填写主信号与 yd 的名称范围。")
+        st.stop()
 
-result = build_main_then_yd_table(df, main_pattern, yd_pattern, match_mode)
+    result = build_main_then_yd_table(df, main_pattern, yd_pattern, match_mode)
 
-st.subheader("结果")
-if result.empty:
-    st.warning("当前条件下没有「先主后 yd」的标的，或侧栏未包含相关信号。")
-else:
-    st.metric("标的数", result["symbol"].nunique())
-    display_df = result.copy()
-    if "间隔(秒)" in display_df.columns:
-        display_df["间隔"] = pd.to_timedelta(display_df["间隔(秒)"], unit="s")
-        display_df = display_df.drop(columns=["间隔(秒)"])
-    st.dataframe(display_df, width="stretch", height=480)
+    st.subheader("结果")
+    if result.empty:
+        st.warning("当前条件下没有「先主后 yd」的标的，或侧栏未包含相关信号。")
+    else:
+        st.metric("标的数", result["symbol"].nunique())
+        display_df = result.copy()
+        if "间隔(秒)" in display_df.columns:
+            display_df["间隔"] = pd.to_timedelta(
+                display_df["间隔(秒)"], unit="s",
+            )
+            display_df = display_df.drop(columns=["间隔(秒)"])
+        st.dataframe(display_df, width="stretch", height=480)

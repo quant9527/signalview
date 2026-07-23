@@ -188,16 +188,18 @@ def _build_charts(
 
 
 def _redirect_when_empty(raw_symbol: str) -> None:
-    """URL 缺少有效 symbol 参数时，在当前页面显示提示并停止。
-
-    早期设计这里用 st.switch_page 跳转到 app_pages.kline.py 的设置页 —
-    但 kline.py 已被合并删除，kline_fullscreen 自身同时是唯一 K 线入口。
-    因此改为：直接在 fullscreen 页内渲染提示，不跳转。
-    """
+    """当 URL 中缺少有效 symbol 参数时，重定向到参数设置页。"""
+    # Use StreamlitPage object so url_path stays in sync with nav registration
+    # (string paths were deprecated in streamlit 1.59).
+    from app_pages.kline import page_kline
+    st.switch_page(
+        st.Page(page_kline, title="K 线", icon="🕯️", url_path="kline")
+    )
+    # switch_page raises / halts execution in normal flow; the lines below
+    # are only reachable if the runtime falls back to a no-op.
     has_raw = bool(raw_symbol)
     title = "参数格式无效" if has_raw else "缺少 K 线标的参数"
     st.warning(title)
-    st.info("请通过「快捷添加」或「添加标的」选择至少一个标的后再访问。")
     st.stop()
 
 
@@ -208,11 +210,16 @@ def page_kline_fullscreen() -> None:
         unsafe_allow_html=True,
     )
 
-    # Bidirectional link is gone now that kline.py is folded into fullscreen.
-    # The /kline URL IS this page; the "kline_fullscreen" alias only exists
-    # historically. Page navigation happens via the sidebar nav widget.
-    # Kept as a no-op so the layout is stable.
-    pass
+    # Bidirectional link back to the settings page (keeps current query params).
+    from app_pages.kline import page_kline
+    _SETTINGS_PAGE = st.Page(
+        page_kline, title="K 线", icon="🕯️", url_path="kline",
+    )
+    with st.container(horizontal=True, horizontal_alignment="right"):
+        st.page_link(
+            _SETTINGS_PAGE, label="返回设置",
+            icon=":material/arrow_back:",
+        )
 
     default_end = date.today()
     default_start = default_end - timedelta(days=365)

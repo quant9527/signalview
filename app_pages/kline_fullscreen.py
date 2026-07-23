@@ -189,9 +189,14 @@ def _build_charts(
 
 def _redirect_when_empty(raw_symbol: str) -> None:
     """当 URL 中缺少有效 symbol 参数时，重定向到参数设置页。"""
-    # 直接跳转到 K 线参数设置页，不保留空参数入口
-    st.switch_page("app_pages/kline.py")
-    # switch_page 会中断执行；兜底提示仅在异常场景出现
+    # Use StreamlitPage object so url_path stays in sync with nav registration
+    # (string paths were deprecated in streamlit 1.59).
+    from app_pages.kline import page_kline
+    st.switch_page(
+        st.Page(page_kline, title="K 线", icon="🕯️", url_path="kline")
+    )
+    # switch_page raises / halts execution in normal flow; the lines below
+    # are only reachable if the runtime falls back to a no-op.
     has_raw = bool(raw_symbol)
     title = "参数格式无效" if has_raw else "缺少 K 线标的参数"
     st.warning(title)

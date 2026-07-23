@@ -24,9 +24,12 @@ def page_ml_scores() -> None:
     st.set_page_config(layout="wide", page_title="ML Scores")
     st.header("ML Scores (signalml)")
 
+    # signalml is an optional dependency ([project.optional-dependencies] ml).
+    # yaml comes as a transitive of signalml, so we check for signalml and
+    # guide the user with the same message in either missing case.
     try:
-        import yaml
-        from signalml.predict import load_artifact, predict_scores
+        import yaml as _yaml_mod  # noqa: F401
+        from signalml.predict import predict_scores
     except ImportError:
         st.warning(
             "未安装可选依赖 **signalml**。在仓库根目录执行：\n\n"
@@ -55,7 +58,9 @@ def page_ml_scores() -> None:
     meta_path = Path(artifact_dir) / "meta.yaml"
     meta: dict = {}
     if meta_path.is_file():
-        meta = yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
+        # yaml import is paired with predict_scores at the top of this function
+        # so once we reach this line yaml has been imported successfully.
+        meta = _yaml_mod.safe_load(meta_path.read_text(encoding="utf-8")) or {}
 
     df = get_cached_data(45)
     ex_f = meta.get("exchange_filter")
@@ -106,4 +111,4 @@ def page_ml_scores() -> None:
 
     if meta:
         with st.expander("模型 meta.yaml"):
-            st.code(yaml.safe_dump(meta, allow_unicode=True), language="yaml")
+            st.code(_yaml_mod.safe_dump(meta, allow_unicode=True), language="yaml")

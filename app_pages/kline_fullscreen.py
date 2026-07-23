@@ -193,25 +193,16 @@ def _build_charts(
 
 def _redirect_when_empty(raw_symbol: str) -> None:
     """当 URL 中缺少有效 symbol 参数时，重定向到参数设置页。"""
-    # Use StreamlitPage object so url_path stays in sync with nav registration.
-    # streamlit 1.59+ rejects string paths to switch_page that point outside
-    # the main script or the legacy `pages/` directory; kline.py lives in
-    # app_pages/ (not pages/), so the file-path form raises
-    # "Could not find page". Wrapping the callable in st.Page(url_path="kline")
-    # is the form that 1.59+ accepts and matches streamlit_app.py's nav entry.
-    from app_pages.kline import page_kline
-    st.switch_page(
-        st.Page(page_kline, title="K 线", icon="🕯️", url_path="kline")
-    )
-    # switch_page raises / halts execution in normal flow; the lines below
-    # are only reachable if the runtime falls back to a no-op.
+    # 直接跳转到 K 线参数设置页，不保留空参数入口
+    st.switch_page("app_pages/kline.py")
+    # switch_page 会中断执行；兜底提示仅在异常场景出现
     has_raw = bool(raw_symbol)
     title = "参数格式无效" if has_raw else "缺少 K 线标的参数"
     st.warning(title)
     st.stop()
 
 
-def page_kline_fullscreen() -> None:
+def main() -> None:
     st.markdown(
         "<style>div.block-container{padding-top:1rem;padding-bottom:0.5rem;}</style>",
         unsafe_allow_html=True,
@@ -262,3 +253,6 @@ def page_kline_fullscreen() -> None:
 
     total_bars = sum(bar_counts.values())
     st.caption(f"共 {len(bar_counts)} 个标的 · 总计 {total_bars} 根 K 线")
+
+
+main()

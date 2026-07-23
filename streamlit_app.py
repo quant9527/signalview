@@ -24,7 +24,6 @@ from app_pages.dashboard_as import page_dashboard_as
 from app_pages.dashboard_binance import page_dashboard_binance
 from app_pages.dashboard_em import page_dashboard_em
 from app_pages.instrument_groups import page_instrument_groups
-from app_pages.kline import page_kline
 from app_pages.kline_fullscreen import page_kline_fullscreen
 from app_pages.main_then_yd import page_main_then_yd
 from app_pages.ml_scores import page_ml_scores
@@ -62,8 +61,7 @@ pages: dict[str, list[st.StreamlitPage]] = {
         st.Page(page_main_then_yd,            title="主→yd",      icon="🔗", url_path="main_then_yd"),
     ],
     "K线": [
-        st.Page(page_kline,            title="K线",     icon="🕯️", url_path="kline"),
-        st.Page(page_kline_fullscreen, title="K线全屏", icon="📈", url_path="kline_fullscreen"),
+        st.Page(page_kline_fullscreen, title="K线", icon="🕯️", url_path="kline"),
     ],
     "Review": [
         st.Page(page_overview,    title="Overview",     icon="🏠", url_path="overview"),

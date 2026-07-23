@@ -1,4 +1,14 @@
-"""Streamlit entrypoint: registers 8 sections / 24 pages under app_pages/."""
+"""Streamlit entrypoint: registers 8 sections / 24 pages under app_pages/.
+
+Each page is registered as an `st.Page` with a unique `url_path`, so the
+app uses Streamlit's path-based multipage navigation (`st.navigation`).
+URLs are first-class: every signal page is independently addressable,
+bookmarkable, shareable, and refresh-safe.
+
+`st.navigation` renders a section-grouped sidebar by default, which is
+what we want — the navigation lives in the sidebar, and the main area
+runs only the currently routed page.
+"""
 from __future__ import annotations
 
 import streamlit as st
@@ -87,5 +97,8 @@ pages: dict[str, list[st.StreamlitPage]] = {
     ],
 }
 
-pg = st.navigation(pages, position="top")
+# Render section-grouped navigation in the sidebar (Streamlit's default).
+# Each entry's `url_path` makes the page directly addressable, e.g.
+# /today_opportunities, /review_index, /kline_fullscreen, /ml_scores.
+pg = st.navigation(pages)
 pg.run()

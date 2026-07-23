@@ -1,4 +1,4 @@
-# signalview Streamlit 应用，对应 deploy/app/compose.yaml 中的 signalview 服务（端口 8501）
+# signalview Streamlit 应用，对应 ops/app/compose.yaml 中的 signalview 服务（端口 8501）
 FROM python:3.12-slim
 
 WORKDIR /app

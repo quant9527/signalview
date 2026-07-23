@@ -83,13 +83,13 @@ atlas/consumer → 写入信号到 PostgreSQL public.signal 表
 ### 依赖
 - **atlas/consumer** — 写入 PostgreSQL signal 表（如果没有新信号，说明数据流 upstream 有问题）
 - PostgreSQL — 数据库
-- `ops/app/compose.yaml` — signal-dashboard 容器配置
+- `ops/app/compose.yaml` — signalview 容器配置
 
 ## 问题排查指引
 
 | 问题 | 排查方向 |
 |------|----------|
-| Streamlit 页面打不开 | 检查 signal-dashboard 容器状态 :8501 |
+| Streamlit 页面打不开 | 检查 signalview 容器状态 :8501 |
 | 没有信号数据 | 检查 PostgreSQL signal 表是否有数据 → 确认 atlas/consumer 是否正常运行 |
 | 页面数据不更新 | 检查 consumer 是否在消费 Kafka signal topic |
 | 行情对比不显示 | akshare 是否可用 / `data.py` 中 `conn_str` 配置是否正确 |

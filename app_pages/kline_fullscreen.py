@@ -17,7 +17,6 @@ from streamlit.components.v1 import html as st_html
 
 import data
 import flight_kline_client as fkc
-from app_pages import _kline_common as common
 from app_pages import kline_charts as kc
 from symbol_picker import SymbolToken, parse_symbol_tokens
 
@@ -37,15 +36,20 @@ def _symbol_chart_height(chart_count: int) -> int:
 
 
 def _qp_str(key: str) -> str:
-    return common.qp_str(key)
+    return str(st.query_params.get(key, "") or "").strip()
 
 
 def _qp_bool(key: str) -> bool:
-    return common.qp_bool(key)
+    return str(st.query_params.get(key, "") or "").strip() in ("1", "true", "yes")
 
 
 def _parse_iso_date(s: str) -> date | None:
-    return common.parse_iso_date(s)
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s[:10])
+    except ValueError:
+        return None
 
 
 def _back_href(entries: list[SymbolToken], start_d: date, end_d: date, all_signals: bool) -> str:
@@ -199,22 +203,10 @@ def _redirect_when_empty(raw_symbol: str) -> None:
 
 
 def page_kline_fullscreen() -> None:
-    st.set_page_config(layout="wide", page_title="K 线全屏")
     st.markdown(
         "<style>div.block-container{padding-top:1rem;padding-bottom:0.5rem;}</style>",
         unsafe_allow_html=True,
     )
-
-    # Bidirectional link back to the settings page (keeps current query params).
-    from app_pages.kline import page_kline
-    _SETTINGS_PAGE = st.Page(
-        page_kline, title="K 线", icon="🕯️", url_path="kline",
-    )
-    with st.container(horizontal=True, horizontal_alignment="right"):
-        st.page_link(
-            _SETTINGS_PAGE, label="返回设置",
-            icon=":material/arrow_back:",
-        )
 
     default_end = date.today()
     default_start = default_end - timedelta(days=365)

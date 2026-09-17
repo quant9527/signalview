@@ -33,6 +33,15 @@ def page_instrument_groups() -> None:
     st.set_page_config(layout="wide", page_title="Instrument Groups")
     st.header("自选股分组管理")
     st.caption("管理自定义标的分组，供 quant-lab 回测时通过 target=组名 自动选中")
+    flash = st.session_state.pop("ig_flash", None)
+    if flash:
+        level, text = flash
+        if level == "success":
+            st.success(text)
+        elif level == "warning":
+            st.warning(text)
+        else:
+            st.error(text)
     st.divider()
 
     groups_df = get_instrument_groups()
@@ -101,19 +110,35 @@ def page_instrument_groups() -> None:
                     help="勾选后，添加到该分组的成员会标记为 reverse。",
                 )
                 selected = instrument_search_picker(key_prefix=f"ig_{selected_group}")
-                if not selected.empty:
-                    if st.button(
-                        f"添加选中的 {len(selected)} 个标的到 `{selected_group}`",
-                        key=f"add_search_btn_{selected_group}",
-                    ):
-                        added_count = 0
-                        for _, row in selected.iterrows():
-                            if add_instrument_group_member(
-                                selected_group, row["exchange"], row["symbol"], reverse=reverse_flag
-                            ):
-                                added_count += 1
-                        st.success(f"已添加 {added_count} 个标的")
+                picked_key = f"ig_picked_{selected_group}"
+                query_key = f"ig_{selected_group}_query"
+                if not str(st.session_state.get(query_key, "")).strip():
+                    st.session_state.pop(picked_key, None)
+                elif not selected.empty:
+                    st.session_state[picked_key] = selected
+                pending = st.session_state.get(picked_key, selected)
+                n_pending = 0 if pending is None or pending.empty else len(pending)
+                if st.button(
+                    (
+                        f"添加选中的 {n_pending} 个标的到 `{selected_group}`"
+                        if n_pending
+                        else "请先勾选要添加的标的"
+                    ),
+                    key=f"add_search_btn_{selected_group}",
+                    disabled=n_pending == 0,
+                    type="primary",
+                ):
+                    added_count = 0
+                    for _, row in pending.iterrows():
+                        if add_instrument_group_member(
+                            selected_group, row["exchange"], row["symbol"], reverse=reverse_flag
+                        ):
+                            added_count += 1
+                    if added_count:
+                        st.session_state.pop(picked_key, None)
+                        st.session_state["ig_flash"] = ("success", f"已添加 {added_count} 个标的")
                         st.rerun()
+                    st.warning("没有添加任何标的（可能已存在或写入失败）")
 
     with col_right:
         st.subheader("新建分组")

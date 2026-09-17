@@ -421,6 +421,17 @@ def checkbox_data_editor(
     return selected[[c for c in selected.columns if c != checkbox_label]]
 
 
+def _format_alias(value: object) -> str:
+    """Render jsonb alias lists as a stable string for data_editor."""
+    if value is None or value is pd.NA:
+        return ""
+    if isinstance(value, float) and pd.isna(value):
+        return ""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
 def instrument_search_picker(
     key_prefix: str = "search",
     limit: int = 100,
@@ -449,10 +460,14 @@ def instrument_search_picker(
         st.info("未找到匹配的标的")
         return pd.DataFrame()
 
-    st.write(f"找到 {len(results)} 个结果")
+    display = results.copy()
+    if "alias" in display.columns:
+        display["alias"] = display["alias"].map(_format_alias)
+
+    st.write(f"找到 {len(display)} 个结果")
     cols_to_disable = ["exchange", "symbol", "name", "alias", "sub_exchange"]
     selected = checkbox_data_editor(
-        results,
+        display,
         checkbox_label="选择",
         disabled=cols_to_disable,
         key=f"{key_prefix}_editor",

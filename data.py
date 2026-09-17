@@ -591,7 +591,8 @@ def _get_db():
     if not conn_str:
         st.error("未配置数据库连接。请检查 .streamlit/secrets.toml 或 DATABASE_URL 环境变量。")
         st.stop()
-    return psycopg.connect(conn_str)
+    conn = psycopg.connect(conn_str, autocommit=True)
+    return conn
 
 
 def _with_retry(operation):
@@ -673,7 +674,7 @@ def get_instrument_group_members(group_name: str) -> pd.DataFrame:
     """获取指定分组的成员列表。"""
     try:
         return _query_df("""
-            SELECT m.exchange, m.symbol, i.name as instrument_name, m.created_at
+            SELECT m.exchange, m.symbol, m.reverse, i.name as instrument_name, m.created_at
             FROM instrument_group_member m
             LEFT JOIN instrument i ON m.exchange = i.exchange AND m.symbol = i.symbol
             WHERE m.group_name = %s

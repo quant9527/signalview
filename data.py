@@ -930,11 +930,13 @@ def query_signals_by_rule(where_clause: str, limit: int = 50) -> pd.DataFrame:
         # psycopg 会把 SQL 中的 % 当作占位符处理；where_clause 里若含 LIKE 'xxx%'
         # 这类字面量 %，需要提前转义为 %%，否则执行时报 "got '%'" 错误。
         safe_where = where_clause.replace("%", "%%")
+        # 查 signal_alert 视图而非 signal 表：规则 where_clause 可引用 freq_sec
+        # （视图经 LEFT JOIN freq 生成该计算列），与 atlas alert 工作流一致。
         query = f"""
             SELECT id, pick_id, exchange, symbol, freq, symbol_name,
                    signal_date, signal_name, side, price, score, reason,
                    created_at
-            FROM signal
+            FROM signal_alert
             WHERE {safe_where}
             ORDER BY signal_date DESC
             LIMIT %s

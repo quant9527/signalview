@@ -14,14 +14,14 @@ CMP_PREFIX: str = "cmp"
 
 # ---------------------------------------------------------------------------
 # AS 模式范围：所有 AS 模式页面（Signal Filters / AS 模式）的 SQL 都应限制
-# 在以下 exchange 取值范围内，避免 crypto（hyperliquid）等混入。
+# 在以下 exchange 取值范围内，避免 crypto（binancespot / binanceperp）等混入。
 # ---------------------------------------------------------------------------
 AS_ALL_EXCHANGES: tuple[str, ...] = ("as", "ths", "asindex")
 
 # ---------------------------------------------------------------------------
-# 加密交易所集合：K 线页 crypto 聚合下拉项（binance + hyperliquid）。
+# 加密交易所集合：K 线页 crypto 聚合下拉项（binancespot + binanceperp）。
 # ---------------------------------------------------------------------------
-CRYPTO_EXCHANGES: tuple[str, ...] = ("binance", "hyperliquid")
+CRYPTO_EXCHANGES: tuple[str, ...] = ("binancespot", "binanceperp")
 
 # ---------------------------------------------------------------------------
 # nested_2bc 已知全名（可按库内实际继续追加）

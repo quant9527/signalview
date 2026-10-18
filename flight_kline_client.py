@@ -13,6 +13,8 @@ from typing import Any
 
 import pandas as pd
 
+from constants import EXCHANGE_BINANCE_PERP, EXCHANGE_BINANCE_SPOT
+
 
 def default_flight_url() -> str:
     return os.environ.get("FLIGHT_URL", "grpc://127.0.0.1:50001")
@@ -52,23 +54,24 @@ def build_kline_tags(symbols: list[str], exchange: str, kline_freq: str = "1d") 
     - exchange=as：个股 6 位代码，如 as_600519_1d
     - exchange=ths：同个股 6 位规范，如 ths_600519_1d
     - exchange=asindex：指数带 sh/sz，如 asindex_sh000300_1d（沪深300）
-    - exchange=hyperliquid：crypto pair，如 hyperliquid_BTC_1d、hyperliquid_BTC-USDT_1d
+    - exchange=binancespot / binanceperp：crypto pair，如 binancespot_BTCUSDT_1d、binanceperp_ETHUSDT_1d
     """
     ex = str(exchange).strip() or "as"
     fq = str(kline_freq).strip() or "1d"
-    if ex.lower() == EXCHANGE_ASINDEX:
+    ex_lower = ex.lower()
+    if ex_lower == EXCHANGE_ASINDEX:
         tags: list[str] = []
         for raw in symbols:
             sym = _norm_asindex_symbol(raw)
             if sym:
                 tags.append(f"{EXCHANGE_ASINDEX}_{sym}_{fq}")
         return tags
-    if ex.lower() == "hyperliquid":
+    if ex_lower in (EXCHANGE_BINANCE_SPOT, EXCHANGE_BINANCE_PERP):
         tags = []
         for raw in symbols:
             sym = str(raw).strip().upper()
             if sym:
-                tags.append(f"hyperliquid_{sym}_{fq}")
+                tags.append(f"{ex_lower}_{sym}_{fq}")
         return tags
     codes = [_norm_symbol_6(s) for s in symbols]
     codes = [c for c in codes if c.isdigit() and len(c) == 6]

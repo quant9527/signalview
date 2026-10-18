@@ -1,4 +1,4 @@
-"""Streamlit entrypoint: registers 8 sections / 26 pages under app_pages/.
+"""Streamlit entrypoint: registers 8 sections / 27 pages under app_pages/.
 
 Each page is registered as an `st.Page` with a unique `url_path`, so the
 app uses Streamlit's path-based multipage navigation (`st.navigation`).
@@ -21,7 +21,8 @@ from app_pages.backtest_report_detail import page_backtest_report_detail
 from app_pages.backtest_reports import page_backtest_reports
 from app_pages.walkfwd_compare import page_walkfwd_compare
 from app_pages.dashboard_as import page_dashboard_as
-from app_pages.dashboard_binance import page_dashboard_binance
+from app_pages.dashboard_binanceperp import page_dashboard_binanceperp
+from app_pages.dashboard_binancespot import page_dashboard_binancespot
 from app_pages.dashboard_em import page_dashboard_em
 from app_pages.instrument_groups import page_instrument_groups
 from app_pages.kline_fullscreen import page_kline_fullscreen
@@ -45,9 +46,10 @@ from app_pages.today_opportunities import page_today_opportunities
 
 pages: dict[str, list[st.StreamlitPage]] = {
     "Dashboard": [
-        st.Page(page_dashboard_as,      title="AS",      icon="🇨🇳", url_path="dashboard_as"),
-        st.Page(page_dashboard_binance, title="Binance", icon="🪙",  url_path="dashboard_binance"),
-        st.Page(page_dashboard_em,      title="EM",      icon="🌍", url_path="dashboard_em"),
+        st.Page(page_dashboard_as,          title="AS",           icon="🇨🇳", url_path="dashboard_as"),
+        st.Page(page_dashboard_binancespot, title="Binance Spot", icon="🪙", url_path="dashboard_binancespot"),
+        st.Page(page_dashboard_binanceperp, title="Binance Perp", icon="🪙", url_path="dashboard_binanceperp"),
+        st.Page(page_dashboard_em,          title="EM",           icon="🌍", url_path="dashboard_em"),
     ],
     "AS 模式": [
         st.Page(page_today_opportunities, title="今日机会", icon="🎯",

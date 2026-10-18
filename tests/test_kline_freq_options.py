@@ -82,11 +82,11 @@ page_kline_fullscreen()
         ("asindex", KLINE_FREQ_OPTIONS_AS),
         ("em", KLINE_FREQ_OPTIONS_AS),
         ("as_all", KLINE_FREQ_OPTIONS_AS),
-        ("hyperliquid", KLINE_FREQ_OPTIONS_CRYPTO),
-        ("binance", KLINE_FREQ_OPTIONS_CRYPTO),
         ("binancespot", KLINE_FREQ_OPTIONS_CRYPTO),
+        ("binanceperp", KLINE_FREQ_OPTIONS_CRYPTO),
         ("crypto", KLINE_FREQ_OPTIONS_CRYPTO),
-        ("HyperLiquid", KLINE_FREQ_OPTIONS_CRYPTO),
+        ("BinanceSpot", KLINE_FREQ_OPTIONS_CRYPTO),
+        ("BinancePerp", KLINE_FREQ_OPTIONS_CRYPTO),
         ("unknown", KLINE_FREQ_OPTIONS_AS),
         ("", KLINE_FREQ_OPTIONS_AS),
     ],
@@ -109,7 +109,7 @@ def at(tmp_path):
     runner = tmp_path / "kline_freq_runner.py"
     runner.write_text(RUNNER_TEMPLATE)
     app = AppTest.from_file(str(runner))
-    app.query_params["symbol"] = "as:000001:1d,hyperliquid:DASHUSDT:1d"
+    app.query_params["symbol"] = "as:000001:1d,binancespot:BTCUSDT:1d,binanceperp:ETHUSDT:1d"
     app.query_params["start"] = "2025-01-01"
     app.query_params["end"] = "2025-01-10"
     app.query_params["all_signals"] = "0"
@@ -131,26 +131,28 @@ def test_mixed_exchanges_get_their_own_pills(at):
     at.run()
 
     assert _pills_options(at, "kfs_freq_pills_0_as_000001") == list(KLINE_FREQ_OPTIONS_AS)
-    crypto_options = _pills_options(at, "kfs_freq_pills_1_hyperliquid_DASHUSDT")
-    assert crypto_options == list(KLINE_FREQ_OPTIONS_CRYPTO)
-    assert "4h" in crypto_options
+    spot_options = _pills_options(at, "kfs_freq_pills_1_binancespot_BTCUSDT")
+    perp_options = _pills_options(at, "kfs_freq_pills_2_binanceperp_ETHUSDT")
+    assert spot_options == list(KLINE_FREQ_OPTIONS_CRYPTO)
+    assert perp_options == list(KLINE_FREQ_OPTIONS_CRYPTO)
+    assert "4h" in spot_options
 
 
-def test_hyperliquid_can_select_crypto_freq(at):
+def test_binancespot_can_select_crypto_freq(at):
     at.run()
-    at.pills(key="kfs_freq_pills_1_hyperliquid_DASHUSDT").set_value("4h").run()
+    at.pills(key="kfs_freq_pills_1_binancespot_BTCUSDT").set_value("4h").run()
 
-    assert "hyperliquid:DASHUSDT:4h" in _qp_value(at, "symbol")
+    assert "binancespot:BTCUSDT:4h" in _qp_value(at, "symbol")
     last = at.session_state["recorded"][-1]
-    assert "hyperliquid_DASHUSDT_4h" in last["tags"]
+    assert "binancespot_BTCUSDT_4h" in last["tags"]
     assert last["aggregate"] == ""
 
 
-def test_hyperliquid_derived_freq_uses_1d_base(at):
+def test_binanceperp_derived_freq_uses_1d_base(at):
     at.run()
-    at.pills(key="kfs_freq_pills_1_hyperliquid_DASHUSDT").set_value("1M").run()
+    at.pills(key="kfs_freq_pills_2_binanceperp_ETHUSDT").set_value("1M").run()
 
-    assert "hyperliquid:DASHUSDT:1M" in _qp_value(at, "symbol")
+    assert "binanceperp:ETHUSDT:1M" in _qp_value(at, "symbol")
     last = at.session_state["recorded"][-1]
-    assert "hyperliquid_DASHUSDT_1d" in last["tags"]
+    assert "binanceperp_ETHUSDT_1d" in last["tags"]
     assert last["aggregate"] == "1M"

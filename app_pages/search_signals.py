@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
-from utils import get_cached_data
 from pypinyin import lazy_pinyin, Style
+
+from signal_constants import CRYPTO_EXCHANGES
+from utils import get_cached_data
 
 
 def page_search_signals() -> None:
@@ -14,7 +16,6 @@ def page_search_signals() -> None:
     # Legacy session_state keys (no writer in the new design).
     # Kept as setdefault fallbacks for any old client that still injects them.
     st.session_state.setdefault("selected_signals", [])
-    st.session_state.setdefault("_is_binance_page", False)
 
     # 获取查询参数
     query_params = st.query_params
@@ -54,16 +55,21 @@ def page_search_signals() -> None:
     st.divider()
     st.subheader("快速导航")
 
-    nav_col1, nav_col2 = st.columns(2)
+    nav_col1, nav_col2, nav_col3 = st.columns(3)
     with nav_col1:
         if st.button("股票信号", width="stretch"):
             st.query_params.clear()
-            st.query_params["exclude_exchange"] = "binance"
+            st.query_params["exclude_exchange"] = ",".join(CRYPTO_EXCHANGES)
             st.rerun()
     with nav_col2:
-        if st.button("Binance信号", width="stretch"):
+        if st.button("Binance Spot", width="stretch"):
             st.query_params.clear()
-            st.query_params["exchange"] = "binance"
+            st.query_params["exchange"] = "binancespot"
+            st.rerun()
+    with nav_col3:
+        if st.button("Binance Perp", width="stretch"):
+            st.query_params.clear()
+            st.query_params["exchange"] = "binanceperp"
             st.rerun()
 
     df = get_cached_data(45)
@@ -109,8 +115,9 @@ def page_search_signals() -> None:
         df = df[df['exchange'] == preset_exchange]
 
     if exclude_exchange and 'exchange' in df.columns:
-        st.info(f"Excluded Exchange: {exclude_exchange}")
-        df = df[df['exchange'] != exclude_exchange]
+        excluded = {x.strip() for x in str(exclude_exchange).split(",") if x.strip()}
+        st.info(f"Excluded Exchange: {', '.join(sorted(excluded))}")
+        df = df[~df["exchange"].isin(excluded)]
 
     if preset_signals and 'signal_name' in df.columns:
         st.info(f"Auto-selected Signals: {', '.join(preset_signals)}")

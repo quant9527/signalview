@@ -1,6 +1,7 @@
 """Instrument groups management page (url_path=instrument_groups)."""
 from __future__ import annotations
 
+import pandas as pd
 import streamlit as st
 
 from data import (
@@ -26,6 +27,85 @@ def _handle_create_group(name: str, desc: str | None) -> bool:
         return True
     st.warning(f"分组 `{name}` 可能已存在")
     return False
+
+
+def _render_members(selected_group: str, members_df: pd.DataFrame) -> None:
+    """Render the current group's member list and bulk-remove action."""
+    if members_df.empty:
+        st.info(f"分组 `{selected_group}` 暂无成员")
+        return
+
+    st.write(f"**{selected_group}** 共 {len(members_df)} 个标的")
+    display_df = members_df.copy()
+    display_df["操作"] = "移除"
+    event = st.dataframe(
+        display_df,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "exchange": st.column_config.TextColumn("交易所", width="small"),
+            "symbol": st.column_config.TextColumn("代码", width="small"),
+            "reverse": st.column_config.CheckboxColumn("reverse", width="small"),
+            "instrument_name": st.column_config.TextColumn("名称", width="medium"),
+            "created_at": st.column_config.DatetimeColumn("添加时间", width="medium"),
+        },
+        on_select="rerun",
+        selection_mode="multi-row",
+        key=f"members_table_{selected_group}",
+    )
+    selected_rows = event.selection.get("rows", [])
+    if not selected_rows:
+        return
+    to_remove = members_df.iloc[selected_rows]
+    if st.button(
+        f"移除选中的 {len(to_remove)} 个标的",
+        type="primary",
+        key=f"remove_btn_{selected_group}",
+    ):
+        removed_count = 0
+        for _, row in to_remove.iterrows():
+            if remove_instrument_group_member(selected_group, row["exchange"], row["symbol"]):
+                removed_count += 1
+        st.success(f"已移除 {removed_count} 个标的")
+        st.rerun()
+
+
+def _render_add_members(selected_group: str) -> None:
+    """Render search-and-add controls for the selected group."""
+    reverse_flag = st.checkbox(
+        "作为 reverse 标的添加",
+        key=f"reverse_flag_{selected_group}",
+        help="勾选后，添加到该分组的成员会标记为 reverse。",
+    )
+    selected = instrument_search_picker(key_prefix=f"ig_{selected_group}")
+    picked_key = f"ig_picked_{selected_group}"
+    query_key = f"ig_{selected_group}_query"
+    if not str(st.session_state.get(query_key, "")).strip():
+        st.session_state.pop(picked_key, None)
+    elif not selected.empty:
+        st.session_state[picked_key] = selected
+    pending = st.session_state.get(picked_key, selected)
+    n_pending = 0 if pending is None or pending.empty else len(pending)
+    if st.button(
+        (
+            f"添加选中的 {n_pending} 个标的到 `{selected_group}`"
+            if n_pending
+            else "请先勾选要添加的标的"
+        ),
+        key=f"add_search_btn_{selected_group}",
+        disabled=n_pending == 0,
+    ):
+        added_count = 0
+        for _, row in pending.iterrows():
+            if add_instrument_group_member(
+                selected_group, row["exchange"], row["symbol"], reverse=reverse_flag
+            ):
+                added_count += 1
+        if added_count:
+            st.session_state.pop(picked_key, None)
+            st.session_state["ig_flash"] = ("success", f"已添加 {added_count} 个标的")
+            st.rerun()
+        st.warning("没有添加任何标的（可能已存在或写入失败）")
 
 
 def page_instrument_groups() -> None:
@@ -60,85 +140,21 @@ def page_instrument_groups() -> None:
 
             members_df = get_instrument_group_members(selected_group)
 
-            tab_members, tab_add = st.tabs(["📋 成员列表", "➕ 添加成员"])
+            panel_members = "成员列表"
+            panel_add = "添加成员"
+            panel = st.segmented_control(
+                "分组内容",
+                options=[panel_members, panel_add],
+                default=panel_members,
+                required=True,
+                key="ig_manage_panel",
+                label_visibility="collapsed",
+            )
 
-            with tab_members:
-                if members_df.empty:
-                    st.info(f"分组 `{selected_group}` 暂无成员")
-                else:
-                    st.write(f"**{selected_group}** 共 {len(members_df)} 个标的")
-                    display_df = members_df.copy()
-                    display_df["操作"] = "移除"
-
-                    event = st.dataframe(
-                        display_df,
-                        hide_index=True,
-                        width='stretch',
-                        column_config={
-                            "exchange": st.column_config.TextColumn("交易所", width="small"),
-                            "symbol": st.column_config.TextColumn("代码", width="small"),
-                            "reverse": st.column_config.CheckboxColumn("reverse", width="small"),
-                            "instrument_name": st.column_config.TextColumn("名称", width="medium"),
-                            "created_at": st.column_config.DatetimeColumn("添加时间", width="medium"),
-                        },
-                        on_select="rerun",
-                        selection_mode="multi-row",
-                        key=f"members_table_{selected_group}",
-                    )
-
-                    selected_rows = event.selection.get("rows", [])
-                    if selected_rows:
-                        to_remove = members_df.iloc[selected_rows]
-                        if st.button(
-                            f"移除选中的 {len(to_remove)} 个标的",
-                            type="primary",
-                            key=f"remove_btn_{selected_group}",
-                        ):
-                            removed_count = 0
-                            for _, row in to_remove.iterrows():
-                                if remove_instrument_group_member(
-                                    selected_group, row["exchange"], row["symbol"]
-                                ):
-                                    removed_count += 1
-                            st.success(f"已移除 {removed_count} 个标的")
-                            st.rerun()
-
-            with tab_add:
-                reverse_flag = st.checkbox(
-                    "作为 reverse 标的添加",
-                    key=f"reverse_flag_{selected_group}",
-                    help="勾选后，添加到该分组的成员会标记为 reverse。",
-                )
-                selected = instrument_search_picker(key_prefix=f"ig_{selected_group}")
-                picked_key = f"ig_picked_{selected_group}"
-                query_key = f"ig_{selected_group}_query"
-                if not str(st.session_state.get(query_key, "")).strip():
-                    st.session_state.pop(picked_key, None)
-                elif not selected.empty:
-                    st.session_state[picked_key] = selected
-                pending = st.session_state.get(picked_key, selected)
-                n_pending = 0 if pending is None or pending.empty else len(pending)
-                if st.button(
-                    (
-                        f"添加选中的 {n_pending} 个标的到 `{selected_group}`"
-                        if n_pending
-                        else "请先勾选要添加的标的"
-                    ),
-                    key=f"add_search_btn_{selected_group}",
-                    disabled=n_pending == 0,
-                    type="primary",
-                ):
-                    added_count = 0
-                    for _, row in pending.iterrows():
-                        if add_instrument_group_member(
-                            selected_group, row["exchange"], row["symbol"], reverse=reverse_flag
-                        ):
-                            added_count += 1
-                    if added_count:
-                        st.session_state.pop(picked_key, None)
-                        st.session_state["ig_flash"] = ("success", f"已添加 {added_count} 个标的")
-                        st.rerun()
-                    st.warning("没有添加任何标的（可能已存在或写入失败）")
+            if panel == panel_members:
+                _render_members(selected_group, members_df)
+            else:
+                _render_add_members(selected_group)
 
     with col_right:
         st.subheader("新建分组")

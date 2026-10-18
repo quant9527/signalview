@@ -9,7 +9,7 @@ from collections.abc import Collection, Sequence
 import pandas as pd
 import streamlit as st
 
-from constants import EXCHANGE_AS, EXCHANGE_BINANCE, EXCHANGE_EM, EXCHANGE_THS
+from constants import EXCHANGE_AS, EXCHANGE_EM, EXCHANGE_THS
 from data import (
     calculate_performance_metrics,
     clear_a_share_latest_market_cache,
@@ -18,6 +18,7 @@ from data import (
     _get_latest_market_em,
     _get_latest_market_ths,
 )
+from signal_constants import CRYPTO_EXCHANGES
 
 
 def filter_performance_rows(
@@ -255,8 +256,8 @@ def render_performance_signal_table(
             st.stop()
         return False
 
-    if exchange == EXCHANGE_BINANCE:
-        st.warning("Binance 行情尚未支持。")
+    if exchange in CRYPTO_EXCHANGES:
+        st.warning(f"{exchange} 行情尚未支持。")
         if stop_on_empty_work:
             st.stop()
         return False

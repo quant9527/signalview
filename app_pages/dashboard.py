@@ -1,6 +1,6 @@
 """
 Dashboard 公共逻辑：按 exchange 筛选并展示信号。
-供 dashboard_as / dashboard_em / dashboard_binance 调用。
+供 dashboard_as / dashboard_em / dashboard_binancespot / dashboard_binanceperp 调用。
 """
 import streamlit as st
 from utils import display_signals_multiview, get_cached_data
@@ -11,9 +11,14 @@ def render_dashboard(exchange: str) -> None:
     按指定 exchange 筛选缓存数据并多视图展示信号。
 
     Args:
-        exchange: 交易所/数据源标识，如 "as" | "em" | "binance"
+        exchange: 交易所/数据源标识，如 "as" | "em" | "binancespot" | "binanceperp"
     """
-    title_map = {"as": "🇨🇳 AS", "em": "🌍 EM", "binance": "🪙 Binance"}
+    title_map = {
+        "as": "🇨🇳 AS",
+        "em": "🌍 EM",
+        "binancespot": "🪙 Binance Spot",
+        "binanceperp": "🪙 Binance Perp",
+    }
     title = title_map.get(exchange.lower(), exchange)
 
     st.header(f"Dashboard — {title}")

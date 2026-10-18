@@ -41,7 +41,7 @@ def test_parse_multiple_tokens() -> None:
 
 
 def test_parse_roundtrip() -> None:
-    raw = "as:000001:1d,ths:600519:30m,hyperliquid:BTC:1h:reverse"
+    raw = "as:000001:1d,ths:600519:30m,binancespot:BTCUSDT:1h:reverse"
     entries = parse_symbol_tokens(raw)
     assert ",".join(e.token for e in entries) == raw
 
@@ -68,7 +68,7 @@ def test_parse_none_freq_with_reverse() -> None:
 
 
 def test_parse_hidden_roundtrip() -> None:
-    raw = "as:000001,ths:600519:1d,hyperliquid:BTC:1h:reverse"
+    raw = "as:000001,ths:600519:1d,binanceperp:ETHUSDT:1h:reverse"
     entries = parse_symbol_tokens(raw)
     assert ",".join(e.token for e in entries) == raw
 

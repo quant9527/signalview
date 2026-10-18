@@ -1,7 +1,7 @@
 import streamlit as st
-from constants import EXCHANGE_AS, EXCHANGE_EM, EXCHANGE_THS, EXCHANGE_BINANCE
+from constants import EXCHANGE_AS
 from performance_table import render_performance_signal_table
-from signal_constants import SIGNAL_NAME_PREFIXES_PRELOAD
+from signal_constants import CRYPTO_EXCHANGES, SIGNAL_NAME_PREFIXES_PRELOAD
 from utils import get_cached_data
 
 PERF_OTHER_GROUP = "other"
@@ -143,8 +143,8 @@ def render_performance() -> None:
     total_records = len(df)
     st.info(f"📊 Selected signals: {total_signals} | Unique symbols: {total_symbols} | Total records: {total_records}")
 
-    if exchange_option == EXCHANGE_BINANCE:
-        st.warning("Binance exchange not yet implemented")
+    if exchange_option in CRYPTO_EXCHANGES:
+        st.warning(f"{exchange_option} 行情尚未支持。")
         st.stop()
 
     render_performance_signal_table(

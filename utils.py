@@ -446,13 +446,15 @@ def instrument_search_picker(
         key_prefix: Streamlit widget key 前缀，避免同一页多个实例冲突
         limit: 单次搜索返回上限
     """
-    query = st.text_input(
-        "搜索代码、名称或别名",
-        placeholder="输入代码、名称或别名关键字",
-        key=f"{key_prefix}_query",
-    )
+    with st.form(f"{key_prefix}_search_form", border=False, enter_to_submit=True):
+        query = st.text_input(
+            "搜索代码、名称或别名",
+            placeholder="输入代码、名称或别名关键字",
+            key=f"{key_prefix}_query",
+        )
+        st.form_submit_button("搜索")
 
-    if not query.strip():
+    if not str(query or "").strip():
         return pd.DataFrame()
 
     results = search_instruments(query.strip(), limit=limit)

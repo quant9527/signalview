@@ -39,16 +39,16 @@ def fake_get_instruments_by_exchange(exchange):
             "sub_exchange": ["sh"],
             "alias": [["hs300"]],
         }),
-        "binance": pd.DataFrame({
-            "exchange": ["binance"],
+        "binancespot": pd.DataFrame({
+            "exchange": ["binancespot"],
             "symbol": ["BTCUSDT"],
             "name": ["比特币"],
             "sub_exchange": [""],
             "alias": [["btc"]],
         }),
-        "hyperliquid": pd.DataFrame({
-            "exchange": ["hyperliquid"],
-            "symbol": ["ETH"],
+        "binanceperp": pd.DataFrame({
+            "exchange": ["binanceperp"],
+            "symbol": ["ETHUSDT"],
             "name": ["以太坊"],
             "sub_exchange": [""],
             "alias": [["eth"]],
@@ -134,15 +134,15 @@ def test_crypto_add_returns_real_exchange(at):
 
     options = at.selectbox(key="test_picker_symbol_select").options
     assert options[0] == "— 请选择代码 —"
-    # crypto 合集应同时包含 binance 与 hyperliquid 的标的
-    assert "binance:BTCUSDT_比特币_btc" in options
-    assert "hyperliquid:ETH_以太坊" in options
+    # crypto 合集应同时包含 binancespot 与 binanceperp 的标的
+    assert "binancespot:BTCUSDT_比特币_btc" in options
+    assert "binanceperp:ETHUSDT_以太坊_eth" in options
 
-    # 选一个真实的 binance 标的，触发添加
-    at.selectbox(key="test_picker_symbol_select").set_value("binance:BTCUSDT")
+    # 选一个真实的 binancespot 标的，触发添加
+    at.selectbox(key="test_picker_symbol_select").set_value("binancespot:BTCUSDT")
     at.run()
 
-    assert at.session_state["picker_result"] == ("binance", "BTCUSDT")
+    assert at.session_state["picker_result"] == ("binancespot", "BTCUSDT")
     assert "crypto" not in repr(at.session_state["picker_result"])
 
 

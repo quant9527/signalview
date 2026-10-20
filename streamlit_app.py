@@ -1,4 +1,4 @@
-"""Streamlit entrypoint: registers 8 sections / 27 pages under app_pages/.
+"""Streamlit entrypoint: registers 9 sections / 30 pages under app_pages/.
 
 Each page is registered as an `st.Page` with a unique `url_path`, so the
 app uses Streamlit's path-based multipage navigation (`st.navigation`).
@@ -20,6 +20,7 @@ from app_pages.all_signals_by_symbol import page_all_signals_by_symbol
 from app_pages.backtest_report_detail import page_backtest_report_detail
 from app_pages.backtest_reports import page_backtest_reports
 from app_pages.walkfwd_compare import page_walkfwd_compare
+from app_pages.daily_bc_xd4 import page_daily_bc_xd4
 from app_pages.dashboard_as import page_dashboard_as
 from app_pages.dashboard_binanceperp import page_dashboard_binanceperp
 from app_pages.dashboard_binancespot import page_dashboard_binancespot
@@ -54,6 +55,8 @@ pages: dict[str, list[st.StreamlitPage]] = {
     "AS 模式": [
         st.Page(page_today_opportunities, title="今日机会", icon="🎯",
                 url_path="today_opportunities", default=True),
+        st.Page(page_daily_bc_xd4, title="每日看点", icon="📈",
+                url_path="daily_bc_xd4"),
         st.Page(page_review_index,            title="大盘",     icon="📈", url_path="review_index"),
         st.Page(page_review_hotspot,          title="板块热点", icon="🔥", url_path="review_hotspot"),
         st.Page(page_active_vol_then_nestedbc, title="active_vol_then_nestedbc",

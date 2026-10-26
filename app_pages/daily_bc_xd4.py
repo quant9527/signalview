@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -12,9 +12,10 @@ from signal_constants import BC_XD4_PREFIX
 from utils import get_cached_data, sort_freqs
 
 
-# 曲线页默认回看窗口。比单日筛选页更长，方便看趋势。
-_LOOKBACK_DAYS = 180
-_DEFAULT_WINDOW_DAYS = 60
+# 取数起点足够早，覆盖库里全部 bc_xd4；图表默认只画最近半年。
+_ALL_START = date(2000, 1, 1)
+_DEFAULT_MONTHS = 6
+_RANGE_KEY = "daily_bc_xd4_range"
 
 
 def daily_symbol_counts_by_freq(
@@ -79,6 +80,45 @@ def daily_symbol_counts_by_freq(
     return pivot
 
 
+def display_window(
+    data_min: date,
+    data_max: date,
+    today: date,
+) -> tuple[date, date, tuple[date, date]]:
+    """滑块覆盖全部历史，默认选中最近半年。
+
+    返回 ``(最早日, 最晚日, (默认起点, 默认终点))``。
+    历史不足半年时，默认起点退回最早日，即全部。
+    """
+    window_end = min(data_max, today)
+    window_start = min(data_min, window_end)
+    default_start = (
+        pd.Timestamp(window_end) - pd.DateOffset(months=_DEFAULT_MONTHS)
+    ).date()
+    if default_start < window_start:
+        default_start = window_start
+    return window_start, window_end, (default_start, window_end)
+
+
+def _clamp_range(
+    raw: object,
+    window_start: date,
+    window_end: date,
+    default_range: tuple[date, date],
+) -> tuple[date, date]:
+    """把已保存的滑块值收进当前数据边界。"""
+    if not isinstance(raw, tuple) or len(raw) != 2:
+        return default_range
+    start, end = raw
+    if not isinstance(start, date) or not isinstance(end, date):
+        return default_range
+    start = min(max(start, window_start), window_end)
+    end = min(max(end, window_start), window_end)
+    if start > end:
+        return default_range
+    return start, end
+
+
 def page_daily_bc_xd4() -> None:
     """A 股 bc_xd4 每日标的数曲线页。"""
     st.set_page_config(layout="wide", page_title="每日看点 · bc_xd4")
@@ -86,73 +126,93 @@ def page_daily_bc_xd4() -> None:
     st.caption(
         "仅 `exchange = as`，`signal_name` 以 `bc_xd4` 开头。"
         "每个周期一条曲线，纵轴是当日去重后的 symbol 数量。"
+        "默认显示最近半年，下方滑块拖到最早日期即全部历史。"
     )
 
     today = date.today()
-    load_start = today - timedelta(days=_LOOKBACK_DAYS)
     df = get_cached_data(
-        start_date=load_start.isoformat(),
+        start_date=_ALL_START.isoformat(),
         end_date=today.isoformat(),
         signal_name_prefix=BC_XD4_PREFIX,
     )
 
     if df.empty or "signal_date" not in df.columns:
-        st.info("最近 180 天没有 bc_xd4 信号。")
+        st.info("没有 bc_xd4 信号。")
         return
 
     df = df.copy()
     df["signal_date"] = pd.to_datetime(df["signal_date"])
-    data_max = df["signal_date"].dt.date.max()
-    window_end = min(data_max, today)
-    window_start = max(load_start, window_end - timedelta(days=_LOOKBACK_DAYS))
-    default_start = max(window_start, window_end - timedelta(days=_DEFAULT_WINDOW_DAYS))
+    as_dates = df.loc[
+        (df["exchange"].astype(str).str.strip() == EXCHANGE_AS)
+        & df["signal_name"].astype(str).str.startswith(BC_XD4_PREFIX),
+        "signal_date",
+    ].dropna()
+    if as_dates.empty:
+        st.info("没有 A 股 bc_xd4 信号。")
+        return
 
-    date_range = st.slider(
-        "日期范围",
-        min_value=window_start,
-        max_value=window_end,
-        value=(default_start, window_end),
-        format="YYYY-MM-DD",
-        key="daily_bc_xd4_range",
+    window_start, window_end, default_range = display_window(
+        as_dates.min().date(),
+        as_dates.max().date(),
+        today,
     )
+    if _RANGE_KEY not in st.session_state:
+        st.session_state[_RANGE_KEY] = default_range
+    else:
+        st.session_state[_RANGE_KEY] = _clamp_range(
+            st.session_state[_RANGE_KEY],
+            window_start,
+            window_end,
+            default_range,
+        )
+    date_range = st.session_state[_RANGE_KEY]
 
     chart = daily_symbol_counts_by_freq(df, date_range[0], date_range[1])
     freqs = [str(col) for col in chart.columns]
     if not freqs:
         st.info("该日期范围内没有 A 股 bc_xd4 信号。")
-        return
+    else:
+        selected = st.pills(
+            "周期",
+            freqs,
+            selection_mode="multi",
+            default=freqs,
+            key=f"daily_bc_xd4_freqs_{'_'.join(freqs)}",
+        )
+        chosen = [freq for freq in freqs if freq in (selected or [])]
+        if not chosen:
+            st.info("至少选择一个周期。")
+        else:
+            shown = chart[chosen]
+            latest = shown.iloc[-1]
+            previous = shown.iloc[-2] if len(shown) > 1 else None
+            with st.container(horizontal=True):
+                for freq in chosen:
+                    delta = (
+                        None if previous is None else int(latest[freq] - previous[freq])
+                    )
+                    st.metric(
+                        freq,
+                        int(latest[freq]),
+                        delta,
+                        border=True,
+                        chart_data=shown[freq].tolist(),
+                        chart_type="line",
+                        delta_description="较前一日",
+                    )
 
-    selected = st.pills(
-        "周期",
-        freqs,
-        selection_mode="multi",
-        default=freqs,
-        key=f"daily_bc_xd4_freqs_{'_'.join(freqs)}",
-    )
-    chosen = [freq for freq in freqs if freq in (selected or [])]
-    if not chosen:
-        st.info("至少选择一个周期。")
-        return
-
-    shown = chart[chosen]
-    latest = shown.iloc[-1]
-    previous = shown.iloc[-2] if len(shown) > 1 else None
-    with st.container(horizontal=True):
-        for freq in chosen:
-            delta = None if previous is None else int(latest[freq] - previous[freq])
-            st.metric(
-                freq,
-                int(latest[freq]),
-                delta,
-                border=True,
-                chart_data=shown[freq].tolist(),
-                chart_type="line",
-                delta_description="较前一日",
+            st.line_chart(
+                shown,
+                x_label="日期",
+                y_label="symbol 数量",
+                height=420,
             )
 
-    st.line_chart(
-        shown,
-        x_label="日期",
-        y_label="symbol 数量",
-        height=420,
+    st.slider(
+        "日期范围",
+        min_value=window_start,
+        max_value=window_end,
+        format="YYYY-MM-DD",
+        key=_RANGE_KEY,
+        help="默认最近半年。左端拖到最早日期即全部历史。",
     )

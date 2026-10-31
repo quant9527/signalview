@@ -48,6 +48,14 @@ def test_render_candle_svg_empty():
     assert t.render_candle_svg(pd.DataFrame(), "2025-01-01") is None
 
 
+def test_render_candle_svg_skips_nan_rows(bars):
+    # 含 NaN 的行不应产出 "nan" 字符串
+    bars.loc[10, "open"] = float("nan")
+    svg = t.render_candle_svg(bars, "2025-03-01")
+    assert svg is not None
+    assert "nan" not in svg
+
+
 def test_placeholder_svg():
     svg = t.placeholder_svg()
     assert svg.startswith("<svg") and "暂无" in svg

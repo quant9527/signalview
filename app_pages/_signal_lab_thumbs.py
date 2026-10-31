@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 import streamlit as st
 
@@ -20,6 +22,14 @@ FREQ_LOOKBACK_DAYS = {
     "1d": 400, "1w": 2800, "1M": 6000,
 }
 _DEFAULT_LOOKBACK_DAYS = 400
+# freq -> 前瞻日历天数（保证案例日之后能取满 WINDOW_AFTER 根走势）
+FREQ_FORWARD_DAYS = {
+    "15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48,
+    "1d": 60, "1w": 200, "1M": 700,
+}
+_DEFAULT_FORWARD_DAYS = 60
+# 案例日标记容差（单位：天；换算成秒与 _x 比较）
+MARK_TOLERANCE_DAYS = 1.5
 # 派生频率：服务端不直接入库，取 1d 数据由服务端聚合
 DERIVED_FREQS = {"1w": "1d", "1M": "1d"}
 
@@ -37,6 +47,7 @@ def slice_window(
     """取案例日期前 before 根 + 后 after 根；案例日无精确匹配时锚定最近一根。"""
     if bars is None or bars.empty:
         return None
+    bars = bars.reset_index(drop=True)
     target = pd.Timestamp(case_date)
     idx = (bars["_x"] - target).abs().idxmin()
     pos = bars.index.get_loc(idx)
@@ -60,12 +71,13 @@ def fetch_case_bars(code_dates: dict[str, str]) -> dict[str, pd.DataFrame]:
         dates = [pd.Timestamp(d) for _, d in items]
         lookback = FREQ_LOOKBACK_DAYS.get(freq, _DEFAULT_LOOKBACK_DAYS)
         start_ms = int((min(dates) - pd.Timedelta(days=lookback)).value // 1e6)
-        end_ms = int((max(dates) + pd.Timedelta(days=30)).value // 1e6)
+        end_ms = int((max(dates) + pd.Timedelta(days=FREQ_FORWARD_DAYS.get(freq, _DEFAULT_FORWARD_DAYS))).value // 1e6)
         tag_freq = DERIVED_FREQS.get(freq, freq)
         try:
             tags = build_kline_tags(syms, ex, kline_freq=tag_freq)
             df = fetch_kline_dataframe(tags, start_ms, end_ms, kline_aggregate=DERIVED_FREQS.get(freq, ""))
-        except Exception:
+        except Exception as e:
+            print(f"[SignalLabThumbs] fetch failed for ({ex}, {freq}): {e}")
             continue
         if df is None:
             continue
@@ -103,8 +115,11 @@ def render_candle_svg(
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" preserveAspectRatio="none">']
     mark_x: float | None = None
     for i, (_, b) in enumerate(bars.iterrows()):
-        cx = pad_l + step * (i + 0.5)
         o, c = float(b["open"]), float(b["close"])
+        if not (math.isfinite(o) and math.isfinite(c)
+                and math.isfinite(float(b["high"])) and math.isfinite(float(b["low"]))):
+            continue
+        cx = pad_l + step * (i + 0.5)
         up = c >= o
         color = _UP if up else _DOWN
         y_wick_top = pad_t + (hi - float(b["high"])) / span * k_h
@@ -126,7 +141,7 @@ def render_candle_svg(
                 f'<rect x="{cx - body_w / 2:.1f}" y="{y_vol:.1f}" width="{body_w:.1f}" '
                 f'height="{max(0.5, vh):.1f}" fill="{color}" opacity="0.4"/>'
             )
-        if mark_x is None and abs((b["_x"] - target).total_seconds()) < 86400 * 1.5:
+        if mark_x is None and abs((b["_x"] - target).total_seconds()) < 86400 * MARK_TOLERANCE_DAYS:
             mark_x = cx
     if mark_x is not None:
         parts.append(
@@ -146,7 +161,7 @@ def placeholder_svg(width: int = 264, height: int = 148) -> str:
     )
 
 
-@st.cache_data(ttl=86400, max_entries=64, show_spinner=False)
+@st.cache_data(ttl=3600, max_entries=64, show_spinner=False)
 def thumbs_for_page(code_dates: tuple[tuple[str, str], ...]) -> dict[str, str]:
     """为一页案例生成缩略图；key 为 `code|date`，value 为 SVG 字符串。"""
     code_date_map = {code: d for code, d in code_dates}

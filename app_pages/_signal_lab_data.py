@@ -9,6 +9,10 @@ import streamlit as st
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "signal_lab_cases.json"
 
+# 筛选哨兵值：页面层下拉/pills 的「不过滤」首选项
+ALL_STRATEGY = "全部策略"
+ALL_SIGNAL = "全部"
+
 REQUIRED_KEYS = ("id", "name", "date", "code", "signal", "strategy")
 _CASE_KEYS = ("id", "name", "date", "code", "signal", "strategy", "info", "note")
 
@@ -45,17 +49,17 @@ def parse_code(code: str) -> tuple[str, str, str] | None:
 
 def filter_cases(
     cases: list[dict],
-    strategy: str = "全部策略",
+    strategy: str = ALL_STRATEGY,
     keyword: str = "",
-    signal: str = "全部",
+    signal: str = ALL_SIGNAL,
 ) -> list[dict]:
     """按策略/名称关键词/信号类型过滤，date 降序。"""
     kw = keyword.strip().lower()
     out = []
     for c in cases:
-        if strategy != "全部策略" and c["strategy"] != strategy:
+        if strategy != ALL_STRATEGY and c["strategy"] != strategy:
             continue
-        if signal != "全部" and c["signal"] != signal:
+        if signal != ALL_SIGNAL and c["signal"] != signal:
             continue
         if kw and kw not in str(c["name"]).lower():
             continue

@@ -71,3 +71,10 @@ def test_load_cases_from_file(tmp_path: Path):
 def test_load_cases_missing_file(tmp_path: Path):
     with pytest.raises(FileNotFoundError):
         d.load_cases(tmp_path / "nope.json")
+
+
+def test_load_cases_bad_format(tmp_path: Path):
+    p = tmp_path / "bad.json"
+    p.write_text(json.dumps({"count": 1}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        d.load_cases(p)

@@ -75,7 +75,10 @@ def fetch_case_bars(code_dates: dict[str, str]) -> dict[str, pd.DataFrame]:
         tag_freq = DERIVED_FREQS.get(freq, freq)
         try:
             tags = build_kline_tags(syms, ex, kline_freq=tag_freq)
-            df = fetch_kline_dataframe(tags, start_ms, end_ms, kline_aggregate=DERIVED_FREQS.get(freq, ""))
+            df = fetch_kline_dataframe(
+                tags, start_ms, end_ms,
+                kline_aggregate=freq if freq in DERIVED_FREQS else "",
+            )
         except Exception as e:
             print(f"[SignalLabThumbs] fetch failed for ({ex}, {freq}): {e}")
             continue
@@ -117,7 +120,8 @@ def render_candle_svg(
     for i, (_, b) in enumerate(bars.iterrows()):
         o, c = float(b["open"]), float(b["close"])
         if not (math.isfinite(o) and math.isfinite(c)
-                and math.isfinite(float(b["high"])) and math.isfinite(float(b["low"]))):
+                and math.isfinite(float(b["high"])) and math.isfinite(float(b["low"]))
+                and (not has_vol or math.isfinite(float(b.get("volume", 0.0) or 0.0)))):
             continue
         cx = pad_l + step * (i + 0.5)
         up = c >= o

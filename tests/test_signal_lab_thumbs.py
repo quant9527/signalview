@@ -51,6 +51,7 @@ def test_render_candle_svg_empty():
 def test_render_candle_svg_skips_nan_rows(bars):
     # 含 NaN 的行不应产出 "nan" 字符串
     bars.loc[10, "open"] = float("nan")
+    bars.loc[20, "volume"] = float("nan")  # OHLC 有限但 volume=NaN
     svg = t.render_candle_svg(bars, "2025-03-01")
     assert svg is not None
     assert "nan" not in svg

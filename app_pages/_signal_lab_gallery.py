@@ -77,8 +77,8 @@ export default function (component) {
   const cards = (data && data.cards) || [];
   const page = (data && data.page) || 1;
   const total = (data && data.totalPages) || 1;
-  const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => (
-    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]
+  const esc = (s) => String(s).replace(/[&<>'"]/g, (ch) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
   ));
   root.innerHTML = `
     <div class="grid">

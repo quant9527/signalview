@@ -68,11 +68,12 @@ signalview（Streamlit）实现同等体验的案例浏览页面。参考页效�
 
 `app_pages/_signal_lab_thumbs.py`：
 
-- matplotlib 迷你蜡烛图 + 成交量柱，无坐标轴、留白极小
-- 数据：flight K 线客户端按 `code` 拉取；窗口 = 案例日期前 60 根 + 后 20 根，
-  案例日标注箭头
-- 输出 PNG bytes → base64；磁盘缓存（key = `code|date|window`，`st.cache_data`
-  + `max_entries` 限制）；拉取失败返回占位 SVG/PNG，不阻塞整页
+- 自绘 SVG 迷你蜡烛图（零新依赖，matplotlib 不在项目依赖里）+ 成交量柱，
+  无坐标轴、留白极小
+- 数据：flight K 线客户端按 (exchange, freq) 分组批量拉取；窗口 = 案例日期
+  前 60 根 + 后 20 根，案例日虚线标记
+- SVG 字符串直接内嵌组件；`st.cache_data`（key = `code|date`，`max_entries` 限制）
+  ；拉取失败返回占位 SVG，不阻塞整页
 - 每次翻页只为当前页 28 张生成/取缓存
 
 ## 详情大图
@@ -85,8 +86,9 @@ signalview（Streamlit）实现同等体验的案例浏览页面。参考页效�
 | 文件 | 职责 |
 |------|------|
 | `app_pages/signal_lab.py` | 页面主体：读 JSON、筛选、调度卡片墙与弹窗 |
+| `app_pages/_signal_lab_data.py` | 数据加载/校验/筛选/分页纯函数 |
 | `app_pages/_signal_lab_gallery.py` | CCv2 卡片墙组件（HTML/CSS/JS 模板 + 事件回传） |
-| `app_pages/_signal_lab_thumbs.py` | 缩略图生成与缓存 |
+| `app_pages/_signal_lab_thumbs.py` | SVG 缩略图生成与缓存 |
 | `data/signal_lab_cases.json` | 案例静态数据 |
 | `scripts/fetch_signal_lab.py` | 数据抓取说明/脚本 |
 | `tests/test_signal_lab.py` | 单测 |
@@ -99,10 +101,10 @@ signalview（Streamlit）实现同等体验的案例浏览页面。参考页效�
 
 ## 测试
 
-- `_signal_lab_thumbs`：给定合成 OHLC DataFrame，生成非空 PNG；窗口截取正确
+- `_signal_lab_thumbs`：给定合成 OHLC DataFrame，生成非空 SVG；窗口截取正确
 - JSON 加载：正常/缺失/字段缺失三种输入
-- 筛选与翻页索引逻辑：纯函数级单测
-- `AppTest` smoke：页面可运行、无异常
+- 筛选、分页与卡片 payload 构造逻辑：纯函数级单测
+- 浏览器手工验收：卡片墙视觉、弹窗交互、翻页（实现计划 Task 6）
 
 ## 非目标
 

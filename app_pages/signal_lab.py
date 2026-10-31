@@ -150,6 +150,10 @@ def page_signal_lab() -> None:
         st.session_state["sl_filter_sig"] = _filter_sig
         if _GALLERY_KEY in st.session_state and isinstance(st.session_state[_GALLERY_KEY], dict):
             st.session_state[_GALLERY_KEY].pop("page", None)
+        # 筛选变化意味着用户离开了当前浏览上下文，同步清理弹窗状态，
+        # 避免关闭弹窗后任意 rerun 又把详情弹回来
+        st.session_state.pop("sl_case_id", None)
+        st.session_state.pop("sl_case_ids", None)
 
     filtered = d.filter_cases(cases, strategy=strategy, keyword=keyword, signal=signal)
     cur_page = 1

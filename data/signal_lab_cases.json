@@ -1,0 +1,2966 @@
+{
+ "fetched_at": "2026-10-31T21:41:28",
+ "count": 296,
+ "cases": [
+  {
+   "id": "reczz28Q5KDRcuiM",
+   "name": "沐曦股份",
+   "date": "2026-10-19",
+   "code": "as:688802:2h",
+   "signal": "BUY",
+   "strategy": "bc_xd4_macd",
+   "info": "2h MACD金叉触发四段下跌背驰",
+   "note": ""
+  },
+  {
+   "id": "recvtiCs1hIt2o",
+   "name": "BTCUSDT",
+   "date": "2026-08-19",
+   "code": "hyperliquid:BTCUSDT:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrUhcbLCNc5",
+   "name": "贵金属",
+   "date": "2026-08-04",
+   "code": "ths:881169:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "cl2b_triangle 上涨三角形突破信号",
+   "note": ""
+  },
+  {
+   "id": "recvrTuoeQxjol",
+   "name": "高争民爆",
+   "date": "2026-07-27",
+   "code": "as:002827:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "boll_seg_breakout 高争民爆 1h 案例",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevdqBc",
+   "name": "五洲医疗",
+   "date": "2026-07-22",
+   "code": "as:301234:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvq71VvkQU1i",
+   "name": "瑞芯微",
+   "date": "2026-07-21",
+   "code": "as:603893:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_overlap_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3kFoZ",
+   "name": "电力",
+   "date": "2026-07-17",
+   "code": "ths:881145:1h",
+   "signal": "BUY",
+   "strategy": "cmp_early_jc",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6XbcU",
+   "name": "星网锐捷",
+   "date": "2026-06-30",
+   "code": "as:002396:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP7: 60.72%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvsnE5QBV7ey",
+   "name": "锐捷网络",
+   "date": "2026-06-29",
+   "code": "as:301165:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_surge",
+   "info": "a_end 之后 ma5ma10_sc 仅 1 次,落闸条件: a≥2×其余两段+窗口内 high≤a.high;Gate A 当天涨幅 +5.7% 刷窗口新高;未限制同一 a 段只发一次信号",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevsZ3R",
+   "name": "有研硅",
+   "date": "2026-06-26",
+   "code": "as:688432:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm32coy",
+   "name": "有研硅",
+   "date": "2026-06-26",
+   "code": "as:688432:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=104.51%, PnL=104509.0",
+   "note": "高收益案例（Return=104.51%）"
+  },
+  {
+   "id": "recvsEEPev2gs9",
+   "name": "兴业科技",
+   "date": "2026-06-17",
+   "code": "as:002674:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevG3q6",
+   "name": "汇成真空",
+   "date": "2026-06-12",
+   "code": "as:301392:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevKNnW",
+   "name": "聚石化学",
+   "date": "2026-06-10",
+   "code": "as:688669:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvs09ZxSO10q",
+   "name": "未命名",
+   "date": "2026-06-10",
+   "code": "as:600353:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvpVsfR5FXYE",
+   "name": "半导体",
+   "date": "2026-06-10",
+   "code": "ths:881121:1h",
+   "signal": "BUY",
+   "strategy": "cmp_early_jc",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm366Gl",
+   "name": "太辰光",
+   "date": "2026-06-09",
+   "code": "as:300570:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=44.23%, PnL=39083.0",
+   "note": "高收益案例（Return=44.23%）"
+  },
+  {
+   "id": "recvrTLA3ArVz1",
+   "name": "神工股份",
+   "date": "2026-06-09",
+   "code": "as:688233:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "收益率 +87.84%，全部 20619 笔交易中排名第 19",
+   "note": "top20 高收益案例，命中 boll_seg_breakout 1d 信号"
+  },
+  {
+   "id": "recvsEEPevvO1P",
+   "name": "光智科技",
+   "date": "2026-06-08",
+   "code": "as:300489:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevpE6j",
+   "name": "汇成股份",
+   "date": "2026-06-08",
+   "code": "as:688403:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevXXZh",
+   "name": "兴业科技",
+   "date": "2026-06-08",
+   "code": "as:002674:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevWLOL",
+   "name": "金海通",
+   "date": "2026-06-08",
+   "code": "as:603061:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevLEbd",
+   "name": "有研硅",
+   "date": "2026-06-08",
+   "code": "as:688432:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvs0ahO2bRv3",
+   "name": "未命名",
+   "date": "2026-06-08",
+   "code": "as:300489:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTuoeQncfv",
+   "name": "有研硅",
+   "date": "2026-06-08",
+   "code": "as:688432:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "boll_seg_breakout cash_sep top3 收益率案例",
+   "note": ""
+  },
+  {
+   "id": "recvqxAcPtfnxb",
+   "name": "中巨芯",
+   "date": "2026-06-08",
+   "code": "as:688549:15m",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "用户提供的信号案例：中巨芯 15m 2026.6.8 9:45",
+   "note": ""
+  },
+  {
+   "id": "recvs0ajPsWOfc",
+   "name": "未命名",
+   "date": "2026-06-04",
+   "code": "as:002636:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm3X9j9",
+   "name": "铜冠铜箔",
+   "date": "2026-06-04",
+   "code": "as:301217:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=78.73%, PnL=78731.0",
+   "note": "高收益案例（Return=78.73%）"
+  },
+  {
+   "id": "recvqxDbM6A0vD",
+   "name": "和远气体",
+   "date": "2026-06-04",
+   "code": "as:002971:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP3: 78.50%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPev1Zj8",
+   "name": "康强电子",
+   "date": "2026-06-03",
+   "code": "as:002119:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvluzkzhgzE8",
+   "name": "通信线缆及配套",
+   "date": "2026-06-02",
+   "code": "ths:884263:30m",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvs0airYKdCX",
+   "name": "未命名",
+   "date": "2026-06-01",
+   "code": "as:603823:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvkSxaw7wzBa",
+   "name": "中巨芯-688549-bc_xd4_ma5ma10-15m",
+   "date": "2026-05-27",
+   "code": "as:688549:15m",
+   "signal": "BUY",
+   "strategy": "bc_xd4_macd",
+   "info": "四段下跌背驰，macd和ma5ma10同时触发BUY",
+   "note": ""
+  },
+  {
+   "id": "recvkNw8TUhWzD",
+   "name": "锦浪科技",
+   "date": "2026-05-26",
+   "code": "as:300763:15m",
+   "signal": "BUY",
+   "strategy": "bc_xd4_ma5ma10",
+   "info": "macd_jc+ma5ma10_jc 双金叉触发，四段低点 [106.18, 107.95, 108.58, 111.61] 逐段递减创前低，cutoff=05-22 10:00，DEA>0 down 左邻 up seg end 截止",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevHJTG",
+   "name": "商络电子",
+   "date": "2026-05-25",
+   "code": "as:300975:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevwL5R",
+   "name": "中京电子",
+   "date": "2026-05-22",
+   "code": "as:002579:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvs0aiNWQNEL",
+   "name": "未命名",
+   "date": "2026-05-18",
+   "code": "as:300939:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6A9ny",
+   "name": "宝鼎科技",
+   "date": "2026-05-18",
+   "code": "as:002552:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP5: 72.92%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM65VsC",
+   "name": "*ST易录",
+   "date": "2026-05-18",
+   "code": "as:300212:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP8: 59.76%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevvRqO",
+   "name": "贵州燃气",
+   "date": "2026-05-13",
+   "code": "as:600903:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvkmmCc4IQ4H",
+   "name": "贵州燃气",
+   "date": "2026-05-13",
+   "code": "as:600903:2h",
+   "signal": "BUY",
+   "strategy": "rebc_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevVlJL",
+   "name": "通鼎互联",
+   "date": "2026-05-06",
+   "code": "as:002491:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm3RDQs",
+   "name": "大唐发电",
+   "date": "2026-05-06",
+   "code": "as:601991:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=60.92%, PnL=53778.0",
+   "note": "高收益案例（Return=60.92%）"
+  },
+  {
+   "id": "recvrTRdm3AHXi",
+   "name": "诚邦股份",
+   "date": "2026-05-06",
+   "code": "as:603316:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=46.35%, PnL=43063.0",
+   "note": "高收益案例（Return=46.35%）"
+  },
+  {
+   "id": "recvkaGGcLFgHB",
+   "name": "瑞华泰_1w",
+   "date": "2026-04-30",
+   "code": "as:688323:1w",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "score=31.15, 买入时间2026-05-08",
+   "note": ""
+  },
+  {
+   "id": "recvjhzjlijhjA",
+   "name": "润建股份",
+   "date": "2026-04-30",
+   "code": "as:002929:2h",
+   "signal": "BUY",
+   "strategy": "",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm35GwI",
+   "name": "德林海",
+   "date": "2026-04-29",
+   "code": "as:688069:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=53.11%, PnL=18949.0",
+   "note": "高收益案例（Return=53.11%）"
+  },
+  {
+   "id": "recvjdCtjn2cd2",
+   "name": "半导体",
+   "date": "2026-04-29",
+   "code": "ths:881121:30m",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_macd",
+   "info": "score=6.791625, price=14522.044",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm3ODRG",
+   "name": "宝鼎科技",
+   "date": "2026-04-27",
+   "code": "as:002552:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=48.89%, PnL=44531.0",
+   "note": "高收益案例（Return=48.89%）"
+  },
+  {
+   "id": "recvimWVuhq0cr",
+   "name": "安妮股份_1b_2026-04-27 15:00",
+   "date": "2026-04-27",
+   "code": "as:002235:1d",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm3KxTi",
+   "name": "裕太微",
+   "date": "2026-04-24",
+   "code": "as:688515:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=64.16%, PnL=7014.0",
+   "note": "高收益案例（Return=64.16%）"
+  },
+  {
+   "id": "recvkvOubFySXA",
+   "name": "中国长城",
+   "date": "2026-04-23",
+   "code": "as:000066:2h",
+   "signal": "BUY",
+   "strategy": "rebc_surge_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvi3rZZMbw5W",
+   "name": "德龙汇能",
+   "date": "2026-04-23",
+   "code": "as:000593:1h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": "阶段新低后强势反弹+涨停，MACD背离但柱状图拐头向上"
+  },
+  {
+   "id": "recvr0AVPPQgpj",
+   "name": "万通发展",
+   "date": "2026-04-22",
+   "code": "as:600246:1h",
+   "signal": "BUY",
+   "strategy": "",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhCZTwDiYIk",
+   "name": "万通发展",
+   "date": "2026-04-22",
+   "code": "as:600246:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm3x0iU",
+   "name": "华电辽能",
+   "date": "2026-04-21",
+   "code": "as:600396:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=59.61%, PnL=57186.0",
+   "note": "高收益案例（Return=59.61%）"
+  },
+  {
+   "id": "recvhImS1Lmnsg",
+   "name": "华电辽能",
+   "date": "2026-04-21",
+   "code": "as:600396:15m",
+   "signal": "BUY",
+   "strategy": "",
+   "info": "cs=macd_jc, zs_zg=7.7, zs_zd=7.61, zs_start=9211",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6DJUG",
+   "name": "农尚环境",
+   "date": "2026-04-20",
+   "code": "as:300536:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP9: 53.51%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvinZjqqWzmU",
+   "name": "华特气体",
+   "date": "2026-04-20",
+   "code": "as:688268:30m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvinYRgLeCsn",
+   "name": "688268",
+   "date": "2026-04-20",
+   "code": "as:688268:30m",
+   "signal": "",
+   "strategy": "",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviNEWo9JUCz",
+   "name": "华特气体",
+   "date": "2026-04-20",
+   "code": "as:688268:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_surge_macd",
+   "info": "score=70, price=99.2, strength_ratio=2.97, dif_ratio=3.44, macd_ratio=2.49",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6jtZZ",
+   "name": "光迅科技",
+   "date": "2026-04-17",
+   "code": "as:002281:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP6: 69.16%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvj2O0kdNaKE",
+   "name": "顺灏股份",
+   "date": "2026-04-14",
+   "code": "as:002565:1d",
+   "signal": "BUY",
+   "strategy": "ma_rebound",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvkpjV0XNW4v",
+   "name": "贵州燃气",
+   "date": "2026-04-09",
+   "code": "as:600903:2h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviNUsLrW604",
+   "name": "圣阳股份",
+   "date": "2026-04-09",
+   "code": "as:002580:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_surge_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPev3m9g",
+   "name": "四方股份",
+   "date": "2026-04-08",
+   "code": "as:601126:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6jfSG",
+   "name": "深南电路",
+   "date": "2026-04-08",
+   "code": "as:002916:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP6: 71.98%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6eZnz",
+   "name": "润建股份",
+   "date": "2026-04-08",
+   "code": "as:002929:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP7: 64.26%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6bEez",
+   "name": "风华高科",
+   "date": "2026-04-08",
+   "code": "as:000636:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP1: 111.74%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6Q4yM",
+   "name": "冰轮环境",
+   "date": "2026-04-08",
+   "code": "as:000811:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP5: 76.84%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6KV8O",
+   "name": "平治信息",
+   "date": "2026-04-08",
+   "code": "as:300571:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP9: 62.96%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6GrGl",
+   "name": "达实智能",
+   "date": "2026-04-08",
+   "code": "as:002421:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP4: 77.82%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM65pd7",
+   "name": "江海股份",
+   "date": "2026-04-08",
+   "code": "as:002484:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP2: 97.98%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvjpUyMjAxMg",
+   "name": "电子化学品",
+   "date": "2026-04-08",
+   "code": "ths:881172:15m",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviWNTb40Fdr",
+   "name": "中国长城",
+   "date": "2026-04-08",
+   "code": "as:000066:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "{\"max_rise_in_zs_right\": true}",
+   "note": ""
+  },
+  {
+   "id": "recvpgBMwfObLB",
+   "name": "中钨高新",
+   "date": "2026-04-07",
+   "code": "as:000657:1h",
+   "signal": "BUY",
+   "strategy": "bc_xd4_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvpVnfqS4Pp1",
+   "name": "电子化学品",
+   "date": "2026-04-07",
+   "code": "ths:881172:30m",
+   "signal": "BUY",
+   "strategy": "cmp_early_jc",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvkK325kbQdq",
+   "name": "深证50",
+   "date": "2026-04-07",
+   "code": "asindex:sz399850:15m",
+   "signal": "BUY",
+   "strategy": "bc_xd4_ma5ma10",
+   "info": "macd_jc触发，四段低点[8608.86,8666.74,8674.06,8701.27]逐段递减创前低，四段下跌背驰",
+   "note": ""
+  },
+  {
+   "id": "recvjecI5hgNJ4",
+   "name": "共封装光学(CPO)",
+   "date": "2026-04-07",
+   "code": "ths:886033:30m",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviyJ522RGpm",
+   "name": "长城科技",
+   "date": "2026-04-07",
+   "code": "as:603897:1d",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevLNz9",
+   "name": "九州一轨",
+   "date": "2026-04-03",
+   "code": "as:688485:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvkVkR0osaNB",
+   "name": "中巨芯",
+   "date": "2026-04-03",
+   "code": "as:688549:1h",
+   "signal": "BUY",
+   "strategy": "bc_xd4_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhUDPGrhepU",
+   "name": "光智科技",
+   "date": "2026-04-03",
+   "code": "as:300489:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_overlap_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3nx2b",
+   "name": "cl2zs_ma5ma10 - 电力物联网 (NOT_BUY案例)",
+   "date": "2026-03-30",
+   "code": "ths:885819:30m",
+   "signal": "NOT_BUY",
+   "strategy": "cl2zs_ma5ma10",
+   "info": "",
+   "note": "❌ 错误选中案例 | 原始信号: BUY | 价格: 2258.957 | 频率: 30m | 方向: long | 得分: 0.0 | 决策: 应被过滤，需修复策略逻辑"
+  },
+  {
+   "id": "recvhUi119ytmO",
+   "name": "海泰新光",
+   "date": "2026-03-30",
+   "code": "as:688677:1d",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6kQuQ",
+   "name": "新朋股份",
+   "date": "2026-03-27",
+   "code": "as:002328:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP4: 76.08%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3dqbv",
+   "name": "通信线缆及配套",
+   "date": "2026-03-27",
+   "code": "ths:884263:30m",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_macd",
+   "info": "",
+   "note": "价格: 23556.989 | 频率: 30m | 得分: 4.996361 | 方向: long"
+  },
+  {
+   "id": "recvhjfSI3MttN",
+   "name": "神剑股份",
+   "date": "2026-03-25",
+   "code": "as:002361:1h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvs0ai8rqEDD",
+   "name": "未命名",
+   "date": "2026-03-24",
+   "code": "as:601869:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3NdCz",
+   "name": "cl2zs_ma5ma10 - 通信线缆及配套",
+   "date": "2026-03-24",
+   "code": "ths:884263:30m",
+   "signal": "BUY",
+   "strategy": "cl2zs_ma5ma10",
+   "info": "",
+   "note": "价格: 21122.741 | 频率: 30m | 方向: long | 得分: 0.0"
+  },
+  {
+   "id": "recvhTisv0tCEW",
+   "name": "光智科技",
+   "date": "2026-03-24",
+   "code": "as:300489:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevAzgM",
+   "name": "圣阳股份",
+   "date": "2026-03-19",
+   "code": "as:002580:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxAcPtrgGS",
+   "name": "圣阳股份",
+   "date": "2026-03-19",
+   "code": "as:002580:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "用户提供的信号案例：圣阳股份 1d 2026.03.19",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3cR3k",
+   "name": "杰恩股份",
+   "date": "2026-03-19",
+   "code": "as:300668:1h",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvitThkpKzMt",
+   "name": "泰坦股份_2h_2026-03-18 15:00",
+   "date": "2026-03-18",
+   "code": "as:003036:2h",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvitTh9zkR8T",
+   "name": "泰坦股份_2h_2026-03-18 11:30",
+   "date": "2026-03-18",
+   "code": "as:003036:2h",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvizcgrG7Hyu",
+   "name": "和顺石油_not buy_2026-03-17 15:00",
+   "date": "2026-03-17",
+   "code": "as:603353:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "qs_zs",
+   "info": "224 long as:603353:1d | 开仓:44.31 平仓:32.70 | 盈亏:-26.20%(-26052.84) | 持仓20天 | bar:-12.28",
+   "note": ""
+  },
+  {
+   "id": "recviyJ522AwYh",
+   "name": "朗科科技",
+   "date": "2026-03-16",
+   "code": "as:300042:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3G7WO",
+   "name": "航锦科技",
+   "date": "2026-03-05",
+   "code": "as:000818:2h",
+   "signal": "NOT_BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvs0aj8OR4xa",
+   "name": "未命名",
+   "date": "2026-03-04",
+   "code": "as:300257:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvr1XEtInSbg",
+   "name": "德明利_2h_2026-03-04 11:30",
+   "date": "2026-03-04",
+   "code": "as:001309:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_pair",
+   "info": "vbt 回测信号：up_a=[796,812] up_b=[824,834]，downs 末段创新低；买 250.59 → 2026-03-20 卖 331.17 (+32.2%)",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3QU56",
+   "name": "华电辽能",
+   "date": "2026-03-03",
+   "code": "as:600396:1h",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3AX0Y",
+   "name": "油气开采及服务",
+   "date": "2026-02-27",
+   "code": "ths:881107:30m",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3jWQR",
+   "name": "天准科技",
+   "date": "2026-02-26",
+   "code": "as:688003:1h",
+   "signal": "NOT_BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrU3Vme6fhW",
+   "name": "华电辽能",
+   "date": "2026-02-24",
+   "code": "as:600396:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "更新为 2h 周期命中点，close=3.21",
+   "note": "macd 段口径命中案例"
+  },
+  {
+   "id": "recvrTRdm3e6Mv",
+   "name": "招商轮船",
+   "date": "2026-02-24",
+   "code": "as:601872:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=45.94%, PnL=45013.0",
+   "note": "高收益案例（Return=45.94%）"
+  },
+  {
+   "id": "recvqxDbM6rPqj",
+   "name": "九安医疗",
+   "date": "2026-02-24",
+   "code": "as:002432:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP3: 88.96%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recviyJ522R8gG",
+   "name": "山东墨龙",
+   "date": "2026-02-24",
+   "code": "as:002490:1d",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI38bgI",
+   "name": "上证指数",
+   "date": "2026-02-13",
+   "code": "asindex:sh000001:1w:reverse",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhTirPJWToZ",
+   "name": "法尔胜",
+   "date": "2026-02-13",
+   "code": "as:000890:1d",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6VFle",
+   "name": "豫能控股",
+   "date": "2026-02-06",
+   "code": "as:001896:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP1: 138.54%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6JxcP",
+   "name": "章源钨业",
+   "date": "2026-02-06",
+   "code": "as:002378:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP2: 82.68%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recviNT1FgQ5fj",
+   "name": "豫能控股",
+   "date": "2026-02-06",
+   "code": "as:001896:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_surge_macd",
+   "info": "score=70, price=6.51, 回测收益+46.96%",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3VQew",
+   "name": "cl2zs_ma5ma10 - 小金属",
+   "date": "2026-02-06",
+   "code": "ths:881170:30m",
+   "signal": "BUY",
+   "strategy": "cl2zs_ma5ma10",
+   "info": "",
+   "note": "价格: 8942.380 | 频率: 30m | 方向: long | 得分: 0.0"
+  },
+  {
+   "id": "recvhjfSI3TCLA",
+   "name": "影视院线",
+   "date": "2026-02-06",
+   "code": "ths:881274:15m",
+   "signal": "BUY",
+   "strategy": "cmp_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPev0Pk5",
+   "name": "顺钠股份",
+   "date": "2026-02-02",
+   "code": "as:000533:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Tkz7",
+   "name": "油气开采及服务",
+   "date": "2026-02-02",
+   "code": "ths:881107:2h",
+   "signal": "BUY",
+   "strategy": "cmp_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI32fjE",
+   "name": "电力",
+   "date": "2026-02-02",
+   "code": "ths:881145:2h",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvs0ajuhDLe4",
+   "name": "未命名",
+   "date": "2026-01-29",
+   "code": "as:002506:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviNSYQhAQdg",
+   "name": "赛分科技",
+   "date": "2026-01-29",
+   "code": "as:688583:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_surge_macd",
+   "info": "score=70, price=108.38, 回测收益+47.87%",
+   "note": ""
+  },
+  {
+   "id": "recvrTRdm3bytK",
+   "name": "巨力索具",
+   "date": "2026-01-28",
+   "code": "as:002342:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "Return=57.37%, PnL=57373.0",
+   "note": "高收益案例（Return=57.37%）"
+  },
+  {
+   "id": "recvhTivhlP4Lg",
+   "name": "通鼎互联",
+   "date": "2026-01-28",
+   "code": "as:002491:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhUi0Hd9gDD",
+   "name": "ST京蓝",
+   "date": "2026-01-26",
+   "code": "as:000711:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhTis1l3I5s",
+   "name": "ST京蓝",
+   "date": "2026-01-26",
+   "code": "as:000711:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvkxb5JbbjXZ",
+   "name": "依依股份",
+   "date": "2026-01-23",
+   "code": "as:001206:1d",
+   "signal": "NOT_BUY",
+   "strategy": "rebc_macd",
+   "info": "test_ban 不买入案例",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3xJl1",
+   "name": "通鼎互联",
+   "date": "2026-01-23",
+   "code": "as:002491:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3gg1T",
+   "name": "ST京蓝",
+   "date": "2026-01-23",
+   "code": "as:000711:2h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviyJ5227h4b",
+   "name": "浙文互联",
+   "date": "2026-01-22",
+   "code": "as:600986:2h",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3kvSe",
+   "name": "金太阳",
+   "date": "2026-01-21",
+   "code": "as:300606:30m",
+   "signal": "BUY",
+   "strategy": "cl3b_zsx",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvsEEPevkRB4",
+   "name": "凯龙高科",
+   "date": "2026-01-20",
+   "code": "as:300912:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTuoeQHHZh",
+   "name": "凯龙高科",
+   "date": "2026-01-20",
+   "code": "as:300912:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "boll_seg_breakout cash_sep top10 收益率案例",
+   "note": ""
+  },
+  {
+   "id": "recviyJ522RR22",
+   "name": "闰土股份",
+   "date": "2026-01-19",
+   "code": "as:002440:2h",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3geES",
+   "name": "半导体",
+   "date": "2026-01-15",
+   "code": "ths:881121:15m",
+   "signal": "BUY",
+   "strategy": "cmp_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI34Bk9",
+   "name": "康强电子20260115",
+   "date": "2026-01-15",
+   "code": "as:000000:1d",
+   "signal": "BUY",
+   "strategy": "",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6wqGo",
+   "name": "翔鹭钨业",
+   "date": "2026-01-14",
+   "code": "as:002842:2h",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "2h 回测收益率 TOP10: 52.41%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recviLdqxpiFwh",
+   "name": "金太阳",
+   "date": "2026-01-14",
+   "code": "as:300606:30m",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3CUaB",
+   "name": "金太阳",
+   "date": "2026-01-14",
+   "code": "as:300606:15m",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviyJ522aDq7",
+   "name": "山金国际",
+   "date": "2026-01-13",
+   "code": "as:000975:1d",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3LqzI",
+   "name": "金太阳",
+   "date": "2026-01-13",
+   "code": "as:300606:1d",
+   "signal": "BUY",
+   "strategy": "active_vol",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrUjdpkHHBY",
+   "name": "贵金属",
+   "date": "2026-01-09",
+   "code": "ths:881169:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "cl2b_triangle 上涨三角形突破信号",
+   "note": ""
+  },
+  {
+   "id": "recvrTuoeQMqRo",
+   "name": "四川黄金",
+   "date": "2026-01-09",
+   "code": "as:001337:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "boll_seg_breakout cash_sep top9 收益率案例",
+   "note": ""
+  },
+  {
+   "id": "recviyJ5221YcZ",
+   "name": "宏盛股份",
+   "date": "2026-01-09",
+   "code": "as:603090:1d",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3lKfF",
+   "name": "融发核电",
+   "date": "2026-01-09",
+   "code": "as:002366:1w",
+   "signal": "NOT_BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviyJ522hsvx",
+   "name": "双杰电气",
+   "date": "2026-01-08",
+   "code": "as:300444:1d",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM6qnHQ",
+   "name": "金海通",
+   "date": "2026-01-05",
+   "code": "as:603061:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP10: 58.97%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvqxDbM62uXa",
+   "name": "圣晖集成",
+   "date": "2026-01-05",
+   "code": "as:603163:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "1d 回测收益率 TOP8: 63.33%（signal_date）",
+   "note": ""
+  },
+  {
+   "id": "recvix4mZroNVF",
+   "name": "和林微纳",
+   "date": "2026-01-05",
+   "code": "as:688661:1d",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "12   long  as:688661:1d 2026-01-06 15:00:00 2026-01-20 15:00:00  56.66  91.79     175  6148.62       62.02  10781.53    20       307.43  bar -1.00  37.35",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI34v8Z",
+   "name": "润泽科技",
+   "date": "2026-01-05",
+   "code": "as:300442:15m",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10_3b",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhTiuPHxmXn",
+   "name": "必贝特",
+   "date": "2026-01-05",
+   "code": "as:688759:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhTisfBpiB0",
+   "name": "迪安诊断",
+   "date": "2026-01-05",
+   "code": "as:300244:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Xphh",
+   "name": "润泽科技",
+   "date": "2025-12-24",
+   "code": "as:300442:1d",
+   "signal": "BUY",
+   "strategy": "active_vol",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3ftqx",
+   "name": "中超控股",
+   "date": "2025-12-23",
+   "code": "as:002471:15m",
+   "signal": "BUY",
+   "strategy": "nested_2bc_active",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3K2sD",
+   "name": "润泽科技",
+   "date": "2025-12-19",
+   "code": "as:300442:15m",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3C4pj",
+   "name": "天际股份",
+   "date": "2025-12-19",
+   "code": "as:002759:1h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10_2b_pending",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI36uIY",
+   "name": "天际股份",
+   "date": "2025-12-19",
+   "code": "as:002759:1h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10_2b",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvkOnr9LbdgL",
+   "name": "蓝箭电子",
+   "date": "2025-12-18",
+   "code": "as:301348:1h",
+   "signal": "BUY",
+   "strategy": "bc_xd4_ma5ma10",
+   "info": "macd_jc 触发，四段低点 [19.22, 19.72, 21.60, 22.36] 逐段递减，cutoff=10-16 11:30（MA5 max=24.76 at 10-20 10:30）",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3RLg8",
+   "name": "金时科技",
+   "date": "2025-12-18",
+   "code": "as:002951:1d",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviNrrqTRwQb",
+   "name": "奕东电子_2h_2025-12-17",
+   "date": "2025-12-17",
+   "code": "as:301123:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_surge_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhriB9vv4Sm",
+   "name": "铜缆高速连接",
+   "date": "2025-12-17",
+   "code": "ths:886073:2h",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_ma5ma10",
+   "info": "return_pct=21.29%, pnl=21209.61, entry=2165.21, shares=2626.29, agg_pnl=250175.08, bars=516",
+   "note": "exit=2626.29, stop=None, mae=-7.54, mfe=697.97"
+  },
+  {
+   "id": "recvhjfSI3PxMs",
+   "name": "蓝色光标",
+   "date": "2025-12-17",
+   "code": "as:300058:30m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3KfV5",
+   "name": "上证指数",
+   "date": "2025-12-17",
+   "code": "asindex:sh000001:1h:reverse",
+   "signal": "BUY",
+   "strategy": "layup_long",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3YJjv",
+   "name": "奕东电子",
+   "date": "2025-12-16",
+   "code": "as:301123:5m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI32ko4",
+   "name": "天际股份",
+   "date": "2025-12-16",
+   "code": "as:002759:1h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3nvjI",
+   "name": "中超控股",
+   "date": "2025-12-12",
+   "code": "as:002471:1w",
+   "signal": "IGNORE_BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3s4S7",
+   "name": "长春一东",
+   "date": "2025-12-09",
+   "code": "as:600148:1d",
+   "signal": "NOT_BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Nehn",
+   "name": "南京商旅",
+   "date": "2025-12-08",
+   "code": "as:600250:2h",
+   "signal": "BUY",
+   "strategy": "yd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhriB9vzERj",
+   "name": "6G概念",
+   "date": "2025-12-05",
+   "code": "ths:886037:2h",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_ma5ma10",
+   "info": "return_pct=23.50%, pnl=23355.88, entry=1910.89, shares=2360.04, agg_pnl=226452.86, bars=336",
+   "note": "exit=2360.04, stop=None, mae=-10.34, mfe=675.63"
+  },
+  {
+   "id": "recvhriB9vUXq4",
+   "name": "通信线缆及配套",
+   "date": "2025-12-05",
+   "code": "ths:884263:2h",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_macd",
+   "info": "return_pct=44.77%, pnl=41857.61, entry=15581.16, shares=22557.43, agg_pnl=288969.94, bars=520",
+   "note": "exit=22557.43, stop=None, mae=-221.71, mfe=10113.99"
+  },
+  {
+   "id": "recvhUhZqNpWni",
+   "name": "顺灏股份",
+   "date": "2025-11-28",
+   "code": "as:002565:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvjq48I51hHt",
+   "name": "商业航天",
+   "date": "2025-11-27",
+   "code": "ths:886078:30m",
+   "signal": "BUY",
+   "strategy": "cmp_nfly_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3p0Z4",
+   "name": "中超控股",
+   "date": "2025-11-27",
+   "code": "as:002471:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3oNeE",
+   "name": "平潭发展",
+   "date": "2025-11-27",
+   "code": "as:000592:15m",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3amCi",
+   "name": "奕东电子",
+   "date": "2025-11-25",
+   "code": "as:301123:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3BavH",
+   "name": "国际复材",
+   "date": "2025-11-25",
+   "code": "as:301526:1h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3kstF",
+   "name": "东材科技",
+   "date": "2025-11-24",
+   "code": "as:601208:1h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10_2b_pending",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3gXep",
+   "name": "商业航天 (1)",
+   "date": "2025-11-24",
+   "code": "asindex:sz980018:1h",
+   "signal": "IGNORE_BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3fYo8",
+   "name": "中钨高新",
+   "date": "2025-11-24",
+   "code": "as:000657:30m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3a5Uy",
+   "name": "昀冢科技",
+   "date": "2025-11-24",
+   "code": "as:688260:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3W3uo",
+   "name": "力芯微",
+   "date": "2025-11-24",
+   "code": "as:688601:1h",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3PfwZ",
+   "name": "特一药业",
+   "date": "2025-11-24",
+   "code": "as:002728:2h",
+   "signal": "IGNORE_BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3JjB6",
+   "name": "东芯股份",
+   "date": "2025-11-24",
+   "code": "as:688110:1h",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3H8PD",
+   "name": "东材科技",
+   "date": "2025-11-24",
+   "code": "as:601208:1h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10_2b",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3A8f6",
+   "name": "商业航天20251124",
+   "date": "2025-11-24",
+   "code": "em:BK0963:1h",
+   "signal": "BUY",
+   "strategy": "yd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI36c0M",
+   "name": "东芯股份",
+   "date": "2025-11-24",
+   "code": "as:688110:15m",
+   "signal": "IGNORE_BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI36Qdt",
+   "name": "商业航天",
+   "date": "2025-11-24",
+   "code": "ths:886078:30m",
+   "signal": "BUY",
+   "strategy": "cmp_early_jc",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3OO1E",
+   "name": "航天环宇",
+   "date": "2025-11-21",
+   "code": "as:688523:2h",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3x7q2",
+   "name": "特发信息",
+   "date": "2025-11-20",
+   "code": "as:000070:1d",
+   "signal": "BUY",
+   "strategy": "breakout_ma",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI30CnC",
+   "name": "特发信息",
+   "date": "2025-11-20",
+   "code": "as:000070:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3iMOB",
+   "name": "东材科技",
+   "date": "2025-11-19",
+   "code": "as:601208:1h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3pG0j",
+   "name": "光库科技",
+   "date": "2025-11-17",
+   "code": "as:300620:1h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3jhVh",
+   "name": "江龙船艇",
+   "date": "2025-11-17",
+   "code": "as:300589:2h",
+   "signal": "IGNORE_BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3BPyJ",
+   "name": "久其软件",
+   "date": "2025-11-17",
+   "code": "as:002279:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Zlul",
+   "name": "航天发展",
+   "date": "2025-11-14",
+   "code": "as:000547:2h",
+   "signal": "IGNORE_BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI32L15",
+   "name": "上证指数",
+   "date": "2025-11-14",
+   "code": "asindex:sh000001:1h",
+   "signal": "BUY",
+   "strategy": "layup_short",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3zEat",
+   "name": "航天发展",
+   "date": "2025-11-12",
+   "code": "as:000547:5m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3B35K",
+   "name": "东百集团",
+   "date": "2025-11-10",
+   "code": "as:600693:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3EIxE",
+   "name": "永太科技",
+   "date": "2025-11-06",
+   "code": "as:002326:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3YVVc",
+   "name": "闽东电力",
+   "date": "2025-11-04",
+   "code": "as:000993:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3H9is",
+   "name": "达华智能",
+   "date": "2025-11-03",
+   "code": "as:002512:15m",
+   "signal": "IGNORE_BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3EPjv",
+   "name": "电网设备",
+   "date": "2025-11-03",
+   "code": "em:BK0457:1h",
+   "signal": "IGNORE_BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvj2O0kdVhoy",
+   "name": "中能电气",
+   "date": "2025-10-31",
+   "code": "as:300062:2h",
+   "signal": "BUY",
+   "strategy": "ma_rebound",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3BpEm",
+   "name": "金迪克",
+   "date": "2025-10-31",
+   "code": "as:688670:1w",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3AHEy",
+   "name": "中能电气",
+   "date": "2025-10-31",
+   "code": "as:300062:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_ma5ma10",
+   "info": "",
+   "note": "离开段应该是次级别的走势类型,此时,离开段还没走完,并没有产生比级别的回调,所以不是三买.级别的判断依据是中枢有2个以上的红波或者有一个至少5天红柱的红波,那么三买的回调必须有一次macd死叉"
+  },
+  {
+   "id": "recvhjfSI3w4Na",
+   "name": "欣龙控股",
+   "date": "2025-10-29",
+   "code": "as:000955:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3OmaS",
+   "name": "恩捷股份",
+   "date": "2025-10-29",
+   "code": "as:002812:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3rpcl",
+   "name": "海南发展",
+   "date": "2025-10-28",
+   "code": "as:002163:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": "1757465917658.jpeg"
+  },
+  {
+   "id": "recvhjfSI3k31B",
+   "name": "深圳新星",
+   "date": "2025-10-28",
+   "code": "as:603978:1d",
+   "signal": "BUY",
+   "strategy": "seg_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3DSoX",
+   "name": "实达集团",
+   "date": "2025-10-28",
+   "code": "as:600734:1d",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhUhZ5ZcPoU",
+   "name": "合富中国",
+   "date": "2025-10-28",
+   "code": "as:603122:1d",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3waM6",
+   "name": "航天长峰",
+   "date": "2025-10-24",
+   "code": "as:600855:1w",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI38l89",
+   "name": "星云股份",
+   "date": "2025-10-23",
+   "code": "as:300648:1h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvpguNuEQIBo",
+   "name": "中钨高新",
+   "date": "2025-10-22",
+   "code": "as:000657:2h",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI35FGT",
+   "name": "平潭发展",
+   "date": "2025-10-22",
+   "code": "as:000592:5m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3ygwn",
+   "name": "景旺电子",
+   "date": "2025-10-20",
+   "code": "as:603228:30m",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3hyxg",
+   "name": "海峡创新",
+   "date": "2025-10-17",
+   "code": "as:300300:1w",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3nHVY",
+   "name": "大连圣亚",
+   "date": "2025-10-14",
+   "code": "as:600593:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Vijx",
+   "name": "海南华铁",
+   "date": "2025-10-13",
+   "code": "as:603300:1d",
+   "signal": "NOT_BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3fPQO",
+   "name": "创业板",
+   "date": "2025-10-10",
+   "code": "asindex:sz399006:2h",
+   "signal": "SELL",
+   "strategy": "macd_3bc_short",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3dAAX",
+   "name": "奥普光电_2h_2025-10-10 15:00",
+   "date": "2025-10-10",
+   "code": "as:002338:2h",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI38g3W",
+   "name": "奥普光电",
+   "date": "2025-10-10",
+   "code": "as:002338:15m",
+   "signal": "IGNORE_BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3MLXt",
+   "name": "中国核建",
+   "date": "2025-09-30",
+   "code": "as:601611:1d",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "{\"today_max_rise\": true, \"max_rise_in_zs_right\": true}",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI35UVp",
+   "name": "海科新源",
+   "date": "2025-09-30",
+   "code": "as:301292:1w",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3gohR",
+   "name": "创业板",
+   "date": "2025-09-26",
+   "code": "asindex:sz399006:2h",
+   "signal": "SELL",
+   "strategy": "macd_3bc_short",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3QhHD",
+   "name": "合肥城建",
+   "date": "2025-09-24",
+   "code": "as:002208:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3TiYk",
+   "name": "模板",
+   "date": "2025-09-22",
+   "code": "as:600246:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "up_trend",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3SFbg",
+   "name": "*st元成",
+   "date": "2025-09-22",
+   "code": "as:603388:1h",
+   "signal": "NOT_BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3NpfF",
+   "name": "天龙股份",
+   "date": "2025-09-22",
+   "code": "as:603266:2h",
+   "signal": "NOT_BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": "离开段应该是次级别的走势类型,此时,离开段还没走完,并没有产生比级别的回调,所以不是三买.级别的判断依据是中枢有2个以上的红波或者有一个至少5天红柱的红波,那么三买的回调必须有一次macd死叉"
+  },
+  {
+   "id": "recvhjfSI3E9jr",
+   "name": "万润科技_1h_2025-09-22 12:00",
+   "date": "2025-09-22",
+   "code": "as:002654:1h",
+   "signal": "IGNORE_BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI31pgc",
+   "name": "xx科技_1d_2025-09-22 12:00",
+   "date": "2025-09-22",
+   "code": "as:002654:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3zuE1",
+   "name": "和而泰",
+   "date": "2025-09-16",
+   "code": "as:002402:30m",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3UP2g",
+   "name": "大族数控",
+   "date": "2025-09-09",
+   "code": "as:301200:1h",
+   "signal": "BUY",
+   "strategy": "rebc_bo",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3CtSB",
+   "name": "华建集团",
+   "date": "2025-09-08",
+   "code": "as:600629:30m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3h3Bi",
+   "name": "大族数控",
+   "date": "2025-09-05",
+   "code": "as:301200:1h",
+   "signal": "IGNORE_BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3u1L0",
+   "name": "红豆股份",
+   "date": "2025-09-02",
+   "code": "as:600400:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3R3J3",
+   "name": "先导智能",
+   "date": "2025-08-28",
+   "code": "as:300450:1d",
+   "signal": "BUY",
+   "strategy": "xianren",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3gxVt",
+   "name": "天融信",
+   "date": "2025-08-21",
+   "code": "as:002212:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI34xmy",
+   "name": "半导体",
+   "date": "2025-08-19",
+   "code": "as:002212:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3au0L",
+   "name": "天融信",
+   "date": "2025-08-18",
+   "code": "as:002212:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3tgf6",
+   "name": "中电鑫龙",
+   "date": "2025-08-11",
+   "code": "as:002298:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3blhJ",
+   "name": "同洲电子",
+   "date": "2025-08-11",
+   "code": "as:002052:1h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfLbCVtjk",
+   "name": "万通发展",
+   "date": "2025-08-08",
+   "code": "as:600246:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": "微信图片_2025-09-16_224257_991.png"
+  },
+  {
+   "id": "recvhjfSI3tCNw",
+   "name": "双一科技_1d_2025-08-05 15:00",
+   "date": "2025-08-05",
+   "code": "as:300690:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3dAVj",
+   "name": "中电鑫龙",
+   "date": "2025-08-04",
+   "code": "as:002298:15m",
+   "signal": "IGNORE_BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfLbCfWWk",
+   "name": "液冷服务器-1h",
+   "date": "2025-08-01",
+   "code": "ths:886044:30m",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvitThvLV3hJ",
+   "name": "南京熊猫_1d_2025-07-31 15:00",
+   "date": "2025-07-31",
+   "code": "as:600775:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3EUrg",
+   "name": "中马传动_2h_2025-07-30 15:00",
+   "date": "2025-07-30",
+   "code": "as:603767:1d",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI38cR1",
+   "name": "奕东电子",
+   "date": "2025-07-30",
+   "code": "as:301123:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": "截图_选择区域_20250921113413.png"
+  },
+  {
+   "id": "recvhjfLbCrdZ3",
+   "name": "未命名",
+   "date": "2025-07-30",
+   "code": "as:300731:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhRUKJuZI7c",
+   "name": "奕东电子",
+   "date": "2025-07-30",
+   "code": "as:301123:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "xd_surge分析：高点评在bar=247(2025-07-09 05:00) high=29.58\n目标bar=273(2025-07-28 05:00) close=24.79\n条件5✅ 条件2需第2下跌段完成才满足\n此案例用于调整策略逻辑使其能在bar=273触发",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3y9tU",
+   "name": "东芯股份",
+   "date": "2025-07-25",
+   "code": "as:688110:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3f1j3",
+   "name": "和而泰",
+   "date": "2025-07-23",
+   "code": "as:002402:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Gs1F",
+   "name": "半导体",
+   "date": "2025-07-22",
+   "code": "em:BK1036:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3O5mO",
+   "name": "横河精密",
+   "date": "2025-07-18",
+   "code": "as:300539:1w",
+   "signal": "IGNORE_BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvrTuoeQ3XXS",
+   "name": "东杰智能",
+   "date": "2025-07-17",
+   "code": "as:300486:1d",
+   "signal": "BUY",
+   "strategy": "cl2b_triangle",
+   "info": "boll_seg_breakout 东杰智能 1d 案例",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3AMno",
+   "name": "东杰智能_2h_2025-07-17 11:30",
+   "date": "2025-07-17",
+   "code": "as:300486:2h",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhUi0mDLttK",
+   "name": "北方长龙",
+   "date": "2025-07-17",
+   "code": "as:301357:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3ypsS",
+   "name": "中钨高新",
+   "date": "2025-07-16",
+   "code": "as:000657:30m",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3BPax",
+   "name": "东杰智能",
+   "date": "2025-07-16",
+   "code": "as:300486:1h",
+   "signal": "BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Ygc7",
+   "name": "宁波华翔",
+   "date": "2025-07-14",
+   "code": "as:002048:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3wsYH",
+   "name": "寒武纪",
+   "date": "2025-07-11",
+   "code": "as:688256:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3MwoN",
+   "name": "创业高贝",
+   "date": "2025-07-11",
+   "code": "asindex:sz399694:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_ma5ma10",
+   "info": "",
+   "note": "离开段应该是次级别的走势类型,此时,离开段还没走完,并没有产生比级别的回调,所以不是三买.级别的判断依据是中枢有2个以上的红波或者有一个至少5天红柱的红波,那么三买的回调必须有一次macd死叉"
+  },
+  {
+   "id": "recvhjfSI3Igdf",
+   "name": "华宏科技",
+   "date": "2025-07-11",
+   "code": "as:002645:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI33Qp1",
+   "name": "中钨高新_1d_2025-07-11 15:00",
+   "date": "2025-07-11",
+   "code": "as:000657:1d",
+   "signal": "IGNORE_BUY",
+   "strategy": "qs_zs",
+   "info": "",
+   "note": "屏幕截图 2025-03-05 120133.png"
+  },
+  {
+   "id": "recvhjfSI31Xaj",
+   "name": "银轮股份",
+   "date": "2025-07-09",
+   "code": "as:002126:2h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Txgk",
+   "name": "隆扬电子",
+   "date": "2025-07-01",
+   "code": "as:301389:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": "截图_选择区域_20250921113413.png"
+  },
+  {
+   "id": "recvhjfSI3Im5W",
+   "name": "隆扬电子",
+   "date": "2025-07-01",
+   "code": "as:301389:2h",
+   "signal": "BUY",
+   "strategy": "",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3IXXS",
+   "name": "深证50",
+   "date": "2025-06-24",
+   "code": "asindex:sz399850:1h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3A4Dl",
+   "name": "创业板",
+   "date": "2025-06-24",
+   "code": "asindex:sz399006:30m",
+   "signal": "BUY",
+   "strategy": "rebc_bo",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI30Lw1",
+   "name": "沪深300",
+   "date": "2025-06-23",
+   "code": "asindex:sh000300:30m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3MTmO",
+   "name": "兵装重组",
+   "date": "2025-06-19",
+   "code": "ths:886101:30m",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3m3i2",
+   "name": "和而泰",
+   "date": "2025-06-17",
+   "code": "as:002402:2h",
+   "signal": "BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3ZEen",
+   "name": "长城军工",
+   "date": "2025-06-17",
+   "code": "as:601606:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": "1757465917658.jpeg"
+  },
+  {
+   "id": "recvhjfSI3KY4p",
+   "name": "诺德股份",
+   "date": "2025-06-17",
+   "code": "as:600110:1h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3WAGK",
+   "name": "四方精创",
+   "date": "2025-05-28",
+   "code": "as:300468:1h",
+   "signal": "BUY",
+   "strategy": "yd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3w0fP",
+   "name": "四方精创",
+   "date": "2025-05-26",
+   "code": "as:300468:1h",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3ehhe",
+   "name": "东杰智能",
+   "date": "2025-05-23",
+   "code": "as:300486:1w",
+   "signal": "BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3kEEI",
+   "name": "合锻智能",
+   "date": "2025-05-06",
+   "code": "as:603011:30m",
+   "signal": "BUY",
+   "strategy": "rebc_bo",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3W6A5",
+   "name": "合锻智能",
+   "date": "2025-04-29",
+   "code": "as:603011:30m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3POgL",
+   "name": "华银电力",
+   "date": "2025-04-24",
+   "code": "as:600744:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhUi03ixzIZ",
+   "name": "红墙股份",
+   "date": "2025-04-17",
+   "code": "as:002809:2h",
+   "signal": "BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI30lpl",
+   "name": "贝因美",
+   "date": "2025-04-07",
+   "code": "as:002570:1d",
+   "signal": "BUY",
+   "strategy": "cmp_n_surge_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhUu1j2n6gh",
+   "name": "301596",
+   "date": "2025-03-18",
+   "code": "as:301596:1d",
+   "signal": "NOT_BUY",
+   "strategy": "xd_surge",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfLbCc3D1",
+   "name": "尤夫股份",
+   "date": "2025-03-17",
+   "code": "as:002427:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3oVil",
+   "name": "创业板",
+   "date": "2025-02-25",
+   "code": "asindex:sz399006:2h",
+   "signal": "SELL",
+   "strategy": "macd_3bc_short",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Lorx",
+   "name": "人形机器人",
+   "date": "2025-01-13",
+   "code": "ths:886069:2h",
+   "signal": "BUY",
+   "strategy": "cmp_early_jc",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3VRVa",
+   "name": "和而泰",
+   "date": "2024-12-19",
+   "code": "as:002402:1h:reverse",
+   "signal": "BUY",
+   "strategy": "rebc_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI35MgD",
+   "name": "浩欧博",
+   "date": "2024-10-22",
+   "code": "as:688656:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_zs_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxAcPtpyK5",
+   "name": "瑞芯微",
+   "date": "2024-09-27",
+   "code": "as:603893:1w",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "用户提供的信号案例：瑞芯微 1w 2024.9.27",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3KIws",
+   "name": "cl2zs_ma5ma10 - AI手机",
+   "date": "2024-09-25",
+   "code": "ths:886070:1d",
+   "signal": "BUY",
+   "strategy": "cl2zs_ma5ma10",
+   "info": "",
+   "note": "价格: 931.564 | 频率: 1d | 方向: long | 得分: 0.0"
+  },
+  {
+   "id": "recvr0zTAdcDlb",
+   "name": "常山北明",
+   "date": "2024-09-10",
+   "code": "as:000158:1h",
+   "signal": "BUY",
+   "strategy": "cl2b_pair",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqxAcPtPm98",
+   "name": "常山北明",
+   "date": "2024-09-10",
+   "code": "as:000158:1d",
+   "signal": "BUY",
+   "strategy": "surge_ma",
+   "info": "用户提供的信号案例：常山北明 1d 2024.09.10",
+   "note": ""
+  },
+  {
+   "id": "recviQwM1R8CCn",
+   "name": "常山北明",
+   "date": "2024-09-10",
+   "code": "as:000158:1h",
+   "signal": "BUY",
+   "strategy": "",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recviNHvNlDpFJ",
+   "name": "常山北明",
+   "date": "2024-09-10",
+   "code": "as:000158:2h",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_surge_macd",
+   "info": "score=70, price=7.57, macd_ratio=1.51, dif_ratio=4.66, strength_ratio=3.09",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3Rm66",
+   "name": "常山北明",
+   "date": "2024-09-10",
+   "code": "as:000158:15m",
+   "signal": "BUY",
+   "strategy": "rebc_macd",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvhjfSI3EERj",
+   "name": "常山北明",
+   "date": "2024-09-10",
+   "code": "as:000158:1d",
+   "signal": "BUY",
+   "strategy": "cl3b_seg_ma5ma10",
+   "info": "",
+   "note": ""
+  },
+  {
+   "id": "recvqnDzGDpt0p",
+   "name": "瑞芯微",
+   "date": "2024-03-15",
+   "code": "as:603893",
+   "signal": "BUY",
+   "strategy": "bc_xd4_macd",
+   "info": "",
+   "note": ""
+  }
+ ]
+}

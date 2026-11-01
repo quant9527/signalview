@@ -20,6 +20,17 @@ def signal_class(signal: str) -> str:
     return "sig-" + "".join(ch if ch.isalnum() else "-" for ch in str(signal).lower())[:20]
 
 
+INFO_MAX_CHARS = 60
+
+
+def _info_summary(info: str) -> str:
+    """信息字段截断摘要，超长补省略号。"""
+    text = str(info).strip()
+    if len(text) > INFO_MAX_CHARS:
+        return text[:INFO_MAX_CHARS] + "…"
+    return text
+
+
 def build_cards_payload(cases: list[dict], thumbs: dict[str, str]) -> list[dict]:
     """把当前页案例 + 缩略图组装成组件 data；纯函数。"""
     cards = []
@@ -31,6 +42,9 @@ def build_cards_payload(cases: list[dict], thumbs: dict[str, str]) -> list[dict]
             "dateLabel": str(c["date"]).replace("-", "."),
             "signal": str(c["signal"]),
             "signalClass": signal_class(str(c["signal"])),
+            "code": str(c["code"]),
+            "strategy": str(c.get("strategy") or ""),
+            "info": _info_summary(str(c.get("info") or "")),
             "thumb": thumbs.get(key) or "<svg xmlns='http://www.w3.org/2000/svg'/>",
         })
     return cards
@@ -46,21 +60,29 @@ _CSS = """
   border:1px solid var(--st-border-color,rgba(0,0,0,.08));
   transition:box-shadow .18s ease,transform .18s ease}
 .card:hover{box-shadow:0 8px 24px rgba(0,0,0,.12);transform:translateY(-2px)}
-.thumb{aspect-ratio:16/9;background:var(--st-secondary-background-color,#f5f5f5)}
+.thumb{aspect-ratio:16/9;background:var(--st-secondary-background-color,#f5f5f5);position:relative}
 .thumb svg{width:100%;height:100%;display:block}
 .badge{position:absolute;top:10px;left:10px;padding:2px 10px;border-radius:999px;
   font-size:11px;font-weight:600;letter-spacing:.04em;color:#fff;background:#64748b}
 .badge-buy{background:#5f8d78}.badge-sell{background:#c0504d}
 .badge-ignore{background:#8a8f98}.badge-notbuy{background:#4b5563}
 .badge-long{background:#4a7bb5}
-.hover{position:absolute;inset:0 0 44px 0;display:flex;align-items:center;justify-content:center;
+.hover{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   background:rgba(15,23,42,.45);opacity:0;transition:opacity .18s ease}
 .card:hover .hover{opacity:1}
 .hover span{color:#fff;font-size:13px;border:1px solid rgba(255,255,255,.7);
   border-radius:999px;padding:4px 14px}
 .meta{padding:10px 12px 12px}
 .name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.date{font-size:12px;opacity:.6;margin-top:2px}
+.sub{display:flex;align-items:baseline;gap:6px;margin-top:3px;font-size:12px;opacity:.65}
+.code{font-family:var(--st-mono-font,monospace);font-size:11px;opacity:.9}
+.info{display:flex;align-items:flex-start;gap:6px;margin-top:7px;font-size:12px;
+  opacity:.85;line-height:1.5}
+.strat{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;
+  color:var(--st-primary-color,#4a7bb5);
+  background:color-mix(in srgb,var(--st-primary-color,#4a7bb5) 12%,transparent)}
+.itext{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;
   font-size:13px;opacity:.85}
 .pg{border:1px solid var(--st-border-color,rgba(0,0,0,.15));background:transparent;
@@ -84,12 +106,18 @@ export default function (component) {
     <div class="grid">
       ${cards.map((c) => `
         <div class="card" data-id="${esc(c.id)}">
-          <div class="thumb">${c.thumb || ""}</div>
-          <span class="badge badge-${esc(c.signalClass)}">${esc(c.signal)}</span>
-          <div class="hover"><span>查看详情</span></div>
+          <div class="thumb">${c.thumb || ""}
+            <span class="badge badge-${esc(c.signalClass)}">${esc(c.signal)}</span>
+            <div class="hover"><span>查看详情</span></div>
+          </div>
           <div class="meta">
             <div class="name">${esc(c.name)}</div>
-            <div class="date">${esc(c.dateLabel)}</div>
+            <div class="sub"><span class="code">${esc(c.code)}</span><span>${esc(c.dateLabel)}</span></div>
+            ${c.strategy || c.info ? `
+            <div class="info">
+              ${c.strategy ? `<span class="strat" title="${esc(c.strategy)}">${esc(c.strategy)}</span>` : ""}
+              ${c.info ? `<span class="itext" title="${esc(c.info)}">${esc(c.info)}</span>` : ""}
+            </div>` : ""}
           </div>
         </div>`).join("")}
     </div>

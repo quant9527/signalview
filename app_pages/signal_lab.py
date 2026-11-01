@@ -167,8 +167,9 @@ def page_signal_lab() -> None:
     _filter_sig = f"{strategy}|{keyword.strip()}|{signal}"
     if st.session_state.get("sl_filter_sig") != _filter_sig:
         st.session_state["sl_filter_sig"] = _filter_sig
-        if _GALLERY_KEY in st.session_state and isinstance(st.session_state[_GALLERY_KEY], dict):
-            st.session_state[_GALLERY_KEY].pop("page", None)
+        # 整个 state key 弹掉：CCv2 组件状态的实际结构不保证是
+        # {"page": int}，部分 pop 可能无效；清空全部状态即可回到第 1 页
+        st.session_state.pop(_GALLERY_KEY, None)
         # 筛选变化意味着用户离开了当前浏览上下文，同步清理弹窗状态，
         # 避免关闭弹窗后任意 rerun 又把详情弹回来
         st.session_state.pop("sl_case_id", None)

@@ -1,8 +1,9 @@
-"""SIGNAL LAB 案例数据：加载、校验、筛选、分页（纯函数，便于测试）。"""
+"""SIGNAL LAB 案例数据：加载（PG）、校验、筛选、分页（纯函数，便于测试）。"""
 from __future__ import annotations
 
 import json
 import math
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -16,11 +17,40 @@ ALL_SIGNAL = "全部"
 REQUIRED_KEYS = ("id", "name", "date", "code", "signal", "strategy")
 _CASE_KEYS = ("id", "name", "date", "code", "signal", "strategy", "info", "note")
 
+_SELECT_SQL = (
+    "SELECT id, name, signal_date, symbol_id, signal, strategy, info, note "
+    "FROM signal_lab_case ORDER BY signal_date DESC, id DESC"
+)
+
+
+def _conn_str() -> str | None:
+    """PG 连接串：DATABASE_URL 环境变量优先，其次 secrets.toml 的 quantdb。"""
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        return url
+    try:
+        return st.secrets["connections"]["quantdb"]["url"]
+    except Exception:
+        return None
+
+
+def _rows_to_cases(rows: list[tuple]) -> list[dict]:
+    """DB 行 -> 页面 case dict（date 统一 ISO 字符串）；纯函数。"""
+    return [
+        {
+            "id": str(r[0]), "name": str(r[1] or ""), "date": r[2].isoformat(),
+            "code": str(r[3] or ""), "signal": str(r[4] or ""),
+            "strategy": str(r[5] or ""), "info": str(r[6] or ""),
+            "note": str(r[7] or ""),
+        }
+        for r in rows
+    ]
+
 
 def load_cases(path: Path = DATA_PATH) -> list[dict]:
-    """读取并校验案例 JSON。缺失抛 FileNotFoundError，格式错抛 ValueError。
+    """读取并校验案例 JSON（迁移脚本与测试用；页面运行时不再读 JSON）。
 
-    缺少任一必填键的记录被跳过（不崩溃）。
+    缺失抛 FileNotFoundError，格式错抛 ValueError；缺少必填键的记录被跳过。
     """
     raw = json.loads(path.read_text(encoding="utf-8"))
     cases = raw.get("cases") if isinstance(raw, dict) else None
@@ -35,8 +65,25 @@ def load_cases(path: Path = DATA_PATH) -> list[dict]:
 
 @st.cache_data(ttl=600, max_entries=4)
 def get_cases() -> list[dict]:
-    """页面入口：读取仓库静态数据（短缓存，改 JSON 后最多 10 分钟生效）。"""
-    return load_cases()
+    """页面入口：读 PG signal_lab_case 表（短缓存；迁移后最多 10 分钟生效）。
+
+    连接/查询失败统一转 ValueError，页面层据此显示错误提示。
+    """
+    url = _conn_str()
+    if not url:
+        raise ValueError(
+            "未配置 PG 连接：请设置 DATABASE_URL 或 .streamlit/secrets.toml "
+            "的 connections.quantdb.url"
+        )
+    import psycopg
+
+    try:
+        with psycopg.connect(url, autocommit=True) as conn, conn.cursor() as cur:
+            cur.execute(_SELECT_SQL)
+            rows = cur.fetchall()
+    except psycopg.Error as e:
+        raise ValueError(f"PG 查询 signal_lab_case 失败：{e}") from e
+    return _rows_to_cases(rows)
 
 
 def parse_code(code: str) -> tuple[str, str, str] | None:

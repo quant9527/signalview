@@ -1,5 +1,6 @@
 """SIGNAL LAB 数据层纯函数测试。"""
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,22 @@ def test_paginate(cases):
 def test_strategy_and_signal_options(cases):
     assert d.strategy_options(cases) == ["bc_xd4", "cl2b"]
     assert d.signal_options(cases) == ["BUY", "SELL"]
+
+
+def test_rows_to_cases_maps_db_row():
+    rows = [("r1", "闽东电力", date(2025, 7, 27), "as:000993:1h",
+             "BUY", "bc_xd4", "info", "note")]
+    out = d._rows_to_cases(rows)
+    assert out == [{"id": "r1", "name": "闽东电力", "date": "2025-07-27",
+                    "code": "as:000993:1h", "signal": "BUY",
+                    "strategy": "bc_xd4", "info": "info", "note": "note"}]
+
+
+def test_rows_to_cases_nulls_become_empty():
+    rows = [("r1", None, date(2025, 1, 1), None, None, None, None, None)]
+    out = d._rows_to_cases(rows)
+    assert out[0]["name"] == "" and out[0]["code"] == ""
+    assert out[0]["signal"] == "" and out[0]["info"] == ""
 
 
 def test_load_cases_from_file(tmp_path: Path):

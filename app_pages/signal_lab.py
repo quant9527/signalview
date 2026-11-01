@@ -144,7 +144,7 @@ def page_signal_lab() -> None:
     except (FileNotFoundError, ValueError) as e:
         st.error(
             f"案例数据不可用：{e}。"
-            "请运行 scripts/fetch_signal_lab.py 重新生成 data/signal_lab_cases.json。"
+            "请运行 scripts/migrate_signal_lab_to_pg.py 重新导入数据。"
         )
         return
     if not cases:

@@ -151,16 +151,13 @@ def page_signal_lab() -> None:
 
     _topbar(cases)
 
-    c_strat, c_kw = st.columns([1, 2])
-    with c_strat:
-        strategy = st.selectbox(
-            "策略", [d.ALL_STRATEGY] + d.strategy_options(cases),
-            key="sl_strategy", label_visibility="collapsed",
-        )
-    with c_kw:
-        keyword = st.text_input("搜索案例名称", key="sl_kw",
-                                placeholder="搜索案例名称…", label_visibility="collapsed")
+    # 策略与信号用同一种控件（pills），与飞书原版的 chips 观感一致
     # st.pills 无默认选择时返回 None，需要回落到「全部」哨兵
+    strategy = st.pills(
+        "策略", [d.ALL_STRATEGY] + d.strategy_options(cases), key="sl_strategy"
+    ) or d.ALL_STRATEGY
+    keyword = st.text_input("搜索案例名称", key="sl_kw",
+                            placeholder="搜索案例名称…", label_visibility="collapsed")
     signal = st.pills("信号", [d.ALL_SIGNAL] + d.signal_options(cases), key="sl_signal") or d.ALL_SIGNAL
 
     # 筛选条件变化时重置卡片墙的页码，避免停留在超出范围的旧页

@@ -3,6 +3,7 @@
 数据来自 data/signal_lab_cases.json（飞书策略库抓取），
 卡片缩略图与详情大图按案例 symbol_id 实时渲染 K 线。
 hyperliquid 等未支持交易所的案例（如 hyperliquid:BTCUSDT:1h）显示占位图，属已知限制。
+两段式 code（如 as:603893，缺 freq 段）parse_code 返回 None，详情图降级为「暂不可用」提示。
 """
 from __future__ import annotations
 
@@ -109,12 +110,14 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
             st.markdown(str(value))
 
     prev_b, next_b, _ = st.columns([1, 1, 4])
-    # @st.dialog 是 fragment：按钮点击只 rerun 弹窗函数本身，更新 sl_case_id 即可切换，
-    # 不需要（也不能）在这里 st.rerun() 整个主脚本
+    # 更新 sl_case_id 后必须 scope="fragment" 重跑：弹窗 body 在按钮分支前已用旧值渲染完，
+    # 只重跑弹窗 fragment 本身，不触发主脚本，X 关闭不误弹的行为不受影响
     if prev_b.button("← 上一个", key="sl_prev") and ids:
         st.session_state["sl_case_id"] = ids[(pos - 1) % len(ids)]
+        st.rerun(scope="fragment")
     if next_b.button("下一个 →", key="sl_next") and ids:
         st.session_state["sl_case_id"] = ids[(pos + 1) % len(ids)]
+        st.rerun(scope="fragment")
 
 
 def _topbar(cases: list[dict]) -> None:

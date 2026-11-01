@@ -12,6 +12,7 @@ import streamlit as st
 import streamlit.components.v1 as components_v1  # 与 kline_fullscreen 一致：内联 echarts HTML 用 components.html 渲染
 
 from app_pages import _signal_lab_data as d
+from app_pages import _signal_lab_filters as f
 from app_pages import _signal_lab_gallery as g
 from app_pages import _signal_lab_thumbs as t
 from app_pages import kline_charts as kc
@@ -19,6 +20,7 @@ from flight_kline_client import build_kline_tags, fetch_kline_dataframe
 
 PER_PAGE = 28
 _GALLERY_KEY = "sl_gallery"
+_STRATEGY_SEL_KEY = "sl_strategy_sel"
 
 
 _CHART_HEIGHT = 520
@@ -151,11 +153,18 @@ def page_signal_lab() -> None:
 
     _topbar(cases)
 
-    # 策略与信号用同一种控件（pills），与飞书原版的 chips 观感一致
-    # st.pills 无默认选择时返回 None，需要回落到「全部」哨兵
-    strategy = st.pills(
-        "策略", [d.ALL_STRATEGY] + d.strategy_options(cases), key="sl_strategy"
-    ) or d.ALL_STRATEGY
+    # 策略用分组 CCv2 pills（同前缀一行，组间换行）；信号仍是原生 st.pills
+    strategy_pick = f.render_strategy_groups(
+        d.strategy_options(cases),
+        str(st.session_state.get(_STRATEGY_SEL_KEY) or ""),
+    )
+    picked = getattr(strategy_pick, "select", None)
+    if picked is not None:
+        st.session_state[_STRATEGY_SEL_KEY] = picked
+        # 组件本次已用旧 value 渲染完（高亮滞后一拍），立即重跑让它显示新选中态；
+        # 触发值只消费一次，不会循环
+        st.rerun()
+    strategy = st.session_state.get(_STRATEGY_SEL_KEY) or d.ALL_STRATEGY
     keyword = st.text_input("搜索案例名称", key="sl_kw",
                             placeholder="搜索案例名称…", label_visibility="collapsed")
     signal = st.pills("信号", [d.ALL_SIGNAL] + d.signal_options(cases), key="sl_signal") or d.ALL_SIGNAL

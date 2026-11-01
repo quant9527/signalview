@@ -1,6 +1,7 @@
-"""SIGNAL LAB 卡片缩略图：自绘 SVG 迷你蜡烛图（含成交量柱 + 案例日标记）。
+"""SIGNAL LAB 卡片缩略图：自绘 SVG 蜡烛图（MA5/MA10 + 成交量 + MACD + 案例日标记）。
 
-不引入新依赖；K 线数据按 (exchange, freq) 分组经 flight 批量拉取。
+不引入新依赖；K 线数据按 (exchange, freq) 分组经 flight 批量拉取，
+MA 与 MACD 直接复用 flight 返回的预计算列（ma5/ma10/dif/dea/macd）。
 """
 from __future__ import annotations
 
@@ -13,13 +14,13 @@ from app_pages._signal_lab_data import parse_code
 from app_pages.kline_charts import extract_symbol_data
 from flight_kline_client import build_kline_tags, fetch_kline_dataframe
 
-WINDOW_BEFORE = 60
-WINDOW_AFTER = 20
+WINDOW_BEFORE = 120
+WINDOW_AFTER = 30
 
 # freq -> 回看日历天数（保证能取到 WINDOW_BEFORE + WINDOW_AFTER 根）
 FREQ_LOOKBACK_DAYS = {
-    "15m": 5, "30m": 10, "1h": 30, "2h": 60, "4h": 120,
-    "1d": 400, "1w": 2800, "1M": 6000,
+    "15m": 10, "30m": 20, "1h": 60, "2h": 120, "4h": 240,
+    "1d": 500, "1w": 2800, "1M": 6000,
 }
 _DEFAULT_LOOKBACK_DAYS = 400
 # freq -> 前瞻日历天数（保证案例日之后能取满 WINDOW_AFTER 根走势）
@@ -36,6 +37,12 @@ DERIVED_FREQS = {"1w": "1d", "1M": "1d"}
 _UP = "#26a69a"
 _DOWN = "#ef5350"
 _MARK = "#f59e0b"
+_MA5 = "#f5a623"
+_MA10 = "#4a90e2"
+# 缩略图 viewBox（16:9，与卡片 thumb aspect-ratio 匹配）
+_WIDTH, _HEIGHT = 560, 315
+# 三区高度占比：K线主图 / 成交量 / MACD（剩余为区间隔）
+_K_RATIO, _VOL_RATIO = 0.58, 0.14
 
 
 def slice_window(
@@ -91,72 +98,167 @@ def fetch_case_bars(code_dates: dict[str, str]) -> dict[str, pd.DataFrame]:
     return out
 
 
+def _polyline(points: list[tuple[float, float] | None], color: str, width: float = 1.0) -> str:
+    """把 (x, y) 序列渲染成 polyline；None 处断段，不足两点的段丢弃。"""
+    segs: list[list[tuple[float, float]]] = []
+    cur: list[tuple[float, float]] = []
+    for p in points:
+        if p is None:
+            if len(cur) > 1:
+                segs.append(cur)
+            cur = []
+        else:
+            cur.append(p)
+    if len(cur) > 1:
+        segs.append(cur)
+    out = []
+    for seg in segs:
+        pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in seg)
+        out.append(
+            f'<polyline points="{pts}" fill="none" stroke="{color}" '
+            f'stroke-width="{width}" stroke-linejoin="round"/>'
+        )
+    return "".join(out)
+
+
+def _finite(v: object) -> float | None:
+    """有限浮点值，否则 None（用于指标列 NaN 容错）。"""
+    try:
+        f = float(v)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
 def render_candle_svg(
     bars: pd.DataFrame,
     case_date: str,
-    width: int = 264,
-    height: int = 148,
-    vol_ratio: float = 0.22,
+    width: int = _WIDTH,
+    height: int = _HEIGHT,
 ) -> str | None:
-    """把窗口 K 线渲染成迷你蜡烛 SVG（成交量柱 + 案例日虚线标记）。"""
+    """把窗口 K 线渲染成 SVG（K线+MA5/MA10、成交量柱、MACD、案例日虚线标记）。"""
     if bars is None or len(bars) == 0:
         return None
     n = len(bars)
-    pad_l, pad_r, pad_t = 4.0, 4.0, 6.0
-    plot_h = height - pad_t - 4.0
-    vol_h = plot_h * vol_ratio
-    k_h = plot_h - vol_h - 4.0
+    pad_l, pad_r, pad_t, pad_b = 4.0, 4.0, 6.0, 2.0
+    plot_h = height - pad_t - pad_b
+    gap = plot_h * 0.02
+    k_h = plot_h * _K_RATIO
+    vol_h = plot_h * _VOL_RATIO
+    macd_h = plot_h - k_h - vol_h - 2 * gap
+    k_top = pad_t
+    vol_top = k_top + k_h + gap
+    macd_top = vol_top + vol_h + gap
     step = (width - pad_l - pad_r) / n
-    body_w = max(1.5, step * 0.66)
+    body_w = max(1.2, step * 0.62)
+
+    # 指标列（缺失或全 NaN 时对应区域自动退化为空）
+    ma5 = pd.to_numeric(bars["ma5"], errors="coerce") if "ma5" in bars.columns else None
+    ma10 = pd.to_numeric(bars["ma10"], errors="coerce") if "ma10" in bars.columns else None
+    dif = pd.to_numeric(bars["_macd_dif"], errors="coerce") if "_macd_dif" in bars.columns else None
+    dea = pd.to_numeric(bars["_macd_dea"], errors="coerce") if "_macd_dea" in bars.columns else None
+    hist = pd.to_numeric(bars["_macd_hist"], errors="coerce") if "_macd_hist" in bars.columns else None
+    has_macd = any(s is not None and s.notna().any() for s in (dif, dea, hist))
+
     hi = float(bars["high"].max())
     lo = float(bars["low"].min())
+    for s in (ma5, ma10):
+        if s is not None and s.notna().any():
+            hi = max(hi, float(s.max()))
+            lo = min(lo, float(s.min()))
     span = (hi - lo) or 1.0
     has_vol = "volume" in bars.columns and bars["volume"].notna().any()
     vmax = float(bars["volume"].max()) if has_vol else 0.0
+    mmax = 1.0
+    if has_macd:
+        vals = [abs(f) for s in (dif, dea, hist) if s is not None
+                for f in s.dropna().tolist()]
+        if vals:
+            mmax = max(mmax, max(vals))
+
+    def y_k(v: float) -> float:
+        return k_top + (hi - v) / span * k_h
+
+    def y_m(v: float) -> float:
+        return macd_top + macd_h / 2 - v / mmax * (macd_h / 2)
 
     target = pd.Timestamp(case_date)
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" preserveAspectRatio="none">']
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        'preserveAspectRatio="none">'
+    ]
+    if has_macd:
+        parts.append(
+            f'<line x1="{pad_l:.1f}" y1="{macd_top + macd_h / 2:.1f}" '
+            f'x2="{width - pad_r:.1f}" y2="{macd_top + macd_h / 2:.1f}" '
+            'stroke="#888" stroke-width="0.5" opacity="0.6"/>'
+        )
     mark_x: float | None = None
     for i, (_, b) in enumerate(bars.iterrows()):
-        o, c = float(b["open"]), float(b["close"])
-        if not (math.isfinite(o) and math.isfinite(c)
-                and math.isfinite(float(b["high"])) and math.isfinite(float(b["low"]))
-                and (not has_vol or math.isfinite(float(b.get("volume", 0.0) or 0.0)))):
+        o, c = _finite(b["open"]), _finite(b["close"])
+        h, l = _finite(b["high"]), _finite(b["low"])
+        if o is None or c is None or h is None or l is None:
             continue
+        vol = _finite(b.get("volume")) if has_vol else 0.0
+        if has_vol and vol is None:
+            vol = 0.0
         cx = pad_l + step * (i + 0.5)
-        up = c >= o
-        color = _UP if up else _DOWN
-        y_wick_top = pad_t + (hi - float(b["high"])) / span * k_h
-        y_wick_bot = pad_t + (hi - float(b["low"])) / span * k_h
-        y_top = pad_t + (hi - max(o, c)) / span * k_h
+        color = _UP if c >= o else _DOWN
+        y_wick_top, y_wick_bot = y_k(h), y_k(l)
+        y_top = y_k(max(o, c))
         bh = max(1.0, abs(c - o) / span * k_h)
         parts.append(
-            f'<line x1="{cx:.1f}" y1="{y_wick_top:.1f}" x2="{cx:.1f}" y2="{y_wick_bot:.1f}" '
-            f'stroke="{color}" stroke-width="1"/>'
+            f'<line x1="{cx:.1f}" y1="{y_wick_top:.1f}" x2="{cx:.1f}" '
+            f'y2="{y_wick_bot:.1f}" stroke="{color}" stroke-width="1"/>'
         )
         parts.append(
             f'<rect x="{cx - body_w / 2:.1f}" y="{y_top:.1f}" width="{body_w:.1f}" '
             f'height="{bh:.1f}" fill="{color}"/>'
         )
-        if has_vol:
-            vh = (float(b.get("volume", 0.0) or 0.0) / vmax) * vol_h if vmax else 0.0
-            y_vol = pad_t + k_h + 4.0 + (vol_h - vh)
+        if has_vol and vol is not None:
+            vh = (vol / vmax) * vol_h if vmax else 0.0
+            y_vol = vol_top + (vol_h - vh)
             parts.append(
                 f'<rect x="{cx - body_w / 2:.1f}" y="{y_vol:.1f}" width="{body_w:.1f}" '
                 f'height="{max(0.5, vh):.1f}" fill="{color}" opacity="0.4"/>'
             )
+        if has_macd:
+            hv = _finite(hist.iloc[i]) if hist is not None else None
+            if hv is not None:
+                y0 = y_m(0)
+                yv = y_m(hv)
+                parts.append(
+                    f'<rect x="{cx - body_w / 2:.1f}" y="{min(y0, yv):.1f}" '
+                    f'width="{body_w:.1f}" height="{max(0.5, abs(y0 - yv)):.1f}" '
+                    f'fill="{_UP if hv >= 0 else _DOWN}" opacity="0.55"/>'
+                )
         if mark_x is None and abs((b["_x"] - target).total_seconds()) < 86400 * MARK_TOLERANCE_DAYS:
             mark_x = cx
+
+    # MA 与 MACD 线（逐点 NaN 容错，分段绘制）
+    def line_points(s: pd.Series | None, y_fn) -> list[tuple[float, float] | None]:
+        if s is None:
+            return []
+        return [
+            (pad_l + step * (i + 0.5), y_fn(v)) if (v := _finite(s.iloc[i])) is not None else None
+            for i in range(n)
+        ]
+
+    parts.append(_polyline(line_points(ma5, y_k), _MA5))
+    parts.append(_polyline(line_points(ma10, y_k), _MA10))
+    parts.append(_polyline(line_points(dif, y_m), _MA5))
+    parts.append(_polyline(line_points(dea, y_m), _MA10))
     if mark_x is not None:
         parts.append(
-            f'<line x1="{mark_x:.1f}" y1="{pad_t:.1f}" x2="{mark_x:.1f}" '
-            f'y2="{pad_t + k_h + 4.0 + vol_h:.1f}" stroke="{_MARK}" stroke-width="1" stroke-dasharray="2,2"/>'
+            f'<line x1="{mark_x:.1f}" y1="{k_top:.1f}" x2="{mark_x:.1f}" '
+            f'y2="{macd_top + macd_h:.1f}" stroke="{_MARK}" stroke-width="1" '
+            'stroke-dasharray="3,3"/>'
         )
     parts.append("</svg>")
     return "".join(parts)
 
 
-def placeholder_svg(width: int = 264, height: int = 148) -> str:
+def placeholder_svg(width: int = _WIDTH, height: int = _HEIGHT) -> str:
     """K 线不可用时的占位图。"""
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '

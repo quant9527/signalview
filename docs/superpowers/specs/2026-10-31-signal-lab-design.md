@@ -68,10 +68,10 @@ signalview（Streamlit）实现同等体验的案例浏览页面。参考页效�
 
 `app_pages/_signal_lab_thumbs.py`：
 
-- 自绘 SVG 迷你蜡烛图（零新依赖，matplotlib 不在项目依赖里）+ 成交量柱，
-  无坐标轴、留白极小
+- 自绘 SVG 蜡烛图（零新依赖，matplotlib 不在项目依赖里）+ MA5/MA10 +
+  成交量柱 + MACD（DIF/DEA/柱），无坐标轴、留白极小
 - 数据：flight K 线客户端按 (exchange, freq) 分组批量拉取；窗口 = 案例日期
-  前 60 根 + 后 20 根，案例日虚线标记
+  前 120 根 + 后 30 根，案例日虚线标记；MA/MACD 复用 flight 预计算列
 - SVG 字符串直接内嵌组件；`st.cache_data`（key = `code|date`，`max_entries` 限制）
   ；拉取失败返回占位 SVG，不阻塞整页
 - 每次翻页只为当前页 28 张生成/取缓存

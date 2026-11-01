@@ -2,6 +2,7 @@
 
 数据来自 data/signal_lab_cases.json（飞书策略库抓取），
 卡片缩略图与详情大图按案例 symbol_id 实时渲染 K 线。
+hyperliquid 等未支持交易所的案例（如 hyperliquid:BTCUSDT:1h）显示占位图，属已知限制。
 """
 from __future__ import annotations
 
@@ -19,15 +20,19 @@ PER_PAGE = 28
 _GALLERY_KEY = "sl_gallery"
 
 
-def _case_chart_html(case: dict, height: int = 520) -> str | None:
-    """详情弹窗的完整 echarts K 线 HTML；拉不到数据返回 None。"""
-    parsed = d.parse_code(case["code"])
+_CHART_HEIGHT = 520
+
+
+@st.cache_data(ttl=600, max_entries=32, show_spinner=False)
+def _case_chart_html_cached(code: str, date: str) -> str | None:
+    """详情弹窗的完整 echarts K 线 HTML（按 code+date 缓存）；拉不到数据返回 None。"""
+    parsed = d.parse_code(code)
     if parsed is None:
         return None
     ex, sym, freq = parsed
     lookback = t.FREQ_LOOKBACK_DAYS.get(freq, t._DEFAULT_LOOKBACK_DAYS)
-    start = pd.Timestamp(case["date"]) - pd.Timedelta(days=lookback)
-    end = pd.Timestamp(case["date"]) + pd.Timedelta(days=30)
+    start = pd.Timestamp(date) - pd.Timedelta(days=lookback)
+    end = pd.Timestamp(date) + pd.Timedelta(days=30)
     try:
         tags = build_kline_tags([sym], ex, kline_freq=t.DERIVED_FREQS.get(freq, freq))
         df = fetch_kline_dataframe(
@@ -39,7 +44,7 @@ def _case_chart_html(case: dict, height: int = 520) -> str | None:
         if prepared is None:
             return None
         bars, meta = prepared
-        window = t.slice_window(bars, case["date"], before=150, after=40)
+        window = t.slice_window(bars, date, before=150, after=40)
         if window is None or window.empty:
             return None
         labels = kc.date_labels(window["_x"], freq=freq)
@@ -48,16 +53,27 @@ def _case_chart_html(case: dict, height: int = 520) -> str | None:
         ma_lines = kc.to_echarts_ma(window, meta["ma_cols"])
         macd = kc.to_echarts_macd(window, meta["macd"])
         has_vol = bool(meta["has_volume"] and window["volume"].notna().any())
+        title = f"{code} · {date}"
+        for c in d.get_cases():
+            if c["code"] == code and c["date"] == date:
+                title = f"{c['name']} · {code}"
+                break
         option = kc.build_symbol_candle_option(
-            title=f"{case['name']} · {case['code']}",
+            title=title,
             labels=labels, ohlc=ohlc, volume=vol, ma_lines=ma_lines, macd=macd,
-            has_volume=has_vol, signals=None, height=height, mark_date=case["date"],
+            has_volume=has_vol, signals=None, height=_CHART_HEIGHT, mark_date=date,
         )
-        charts = [{"id": "ch_case", "height": height, "option": option}]
+        charts = [{"id": "ch_case", "height": _CHART_HEIGHT, "option": option}]
         metas = {"ch_case": kc.build_chart_meta(labels, ohlc, ma_lines, [])}
         return kc.build_echarts_html(charts, metas)
-    except Exception:
+    except Exception as e:
+        print(f"[SignalLab] chart failed for {code}: {e}")
         return None
+
+
+def _case_chart_html(case: dict) -> str | None:
+    """薄封装：按案例的 code+date 走缓存渲染详情 K 线。"""
+    return _case_chart_html_cached(str(case["code"]), str(case["date"]))
 
 
 @st.dialog("案例详情", width="large")
@@ -75,7 +91,7 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
     with left:
         html = _case_chart_html(case)
         if html:
-            components_v1.html(html, height=540)
+            components_v1.html(html, height=_CHART_HEIGHT)
         else:
             st.info("K 线数据暂不可用（标的代码无法解析或数据源无此合约）。")
     with right:
@@ -93,12 +109,12 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
             st.markdown(str(value))
 
     prev_b, next_b, _ = st.columns([1, 1, 4])
+    # @st.dialog 是 fragment：按钮点击只 rerun 弹窗函数本身，更新 sl_case_id 即可切换，
+    # 不需要（也不能）在这里 st.rerun() 整个主脚本
     if prev_b.button("← 上一个", key="sl_prev") and ids:
         st.session_state["sl_case_id"] = ids[(pos - 1) % len(ids)]
-        st.rerun()
     if next_b.button("下一个 →", key="sl_next") and ids:
         st.session_state["sl_case_id"] = ids[(pos + 1) % len(ids)]
-        st.rerun()
 
 
 def _topbar(cases: list[dict]) -> None:
@@ -166,6 +182,8 @@ def page_signal_lab() -> None:
     cards = g.build_cards_payload(page_cases, thumbs)
     result = g.render_gallery(cards, page_no, total_pages, key=_GALLERY_KEY)
 
+    # 只在「当次」点击卡片（selected 触发值存在）时打开弹窗；
+    # X 关闭后触发值已消费，后续任何 rerun（翻页/改筛选）都不会再误弹
     selected = getattr(result, "selected", None)
     if selected:
         by_id = {c["id"]: c for c in filtered}
@@ -175,9 +193,7 @@ def page_signal_lab() -> None:
             st.session_state["sl_case_ids"] = [
                 c["id"] for c in filtered if c["strategy"] == hit["strategy"]
             ]
-
-    if st.session_state.get("sl_case_id"):
-        _show_case_dialog({c["id"]: c for c in cases})
+            _show_case_dialog({c["id"]: c for c in cases})
 
     st.markdown(
         f"<div style='text-align:center;opacity:.5;font-size:.8rem;padding:1.5rem 0'>"

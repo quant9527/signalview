@@ -171,7 +171,7 @@ def thumbs_for_page(code_dates: tuple[tuple[str, str], ...]) -> dict[str, str]:
     code_date_map = {code: d for code, d in code_dates}
     bars_map = fetch_case_bars(code_date_map)
     out: dict[str, str] = {}
-    for code, d in code_date_map:
+    for code, d in code_date_map.items():
         bars = bars_map.get(code)
         svg = render_candle_svg(slice_window(bars, d), d) if bars is not None else None
         out[f"{code}|{d}"] = svg or placeholder_svg()

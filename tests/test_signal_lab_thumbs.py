@@ -60,3 +60,20 @@ def test_render_candle_svg_skips_nan_rows(bars):
 def test_placeholder_svg():
     svg = t.placeholder_svg()
     assert svg.startswith("<svg") and "暂无" in svg
+
+
+def test_thumbs_for_page_builds_svg_per_case(monkeypatch, bars):
+    # 回归：迭代 dict 必须用 .items()；fetch_case_bars 打桩，不打网络
+    t.thumbs_for_page.clear()
+    monkeypatch.setattr(t, "fetch_case_bars", lambda m: {"as:000001:1d": bars})
+    out = t.thumbs_for_page((("as:000001:1d", "2025-01-01"),))
+    assert "as:000001:1d|2025-01-01" in out
+    assert out["as:000001:1d|2025-01-01"].startswith("<svg")
+
+
+def test_thumbs_for_page_missing_bars_uses_placeholder(monkeypatch):
+    t.thumbs_for_page.clear()
+    monkeypatch.setattr(t, "fetch_case_bars", lambda m: {})
+    out = t.thumbs_for_page((("as:000001:1d", "2025-01-01"),))
+    assert out["as:000001:1d|2025-01-01"].startswith("<svg")
+    assert "暂无" in out["as:000001:1d|2025-01-01"]

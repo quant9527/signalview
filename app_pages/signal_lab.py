@@ -24,9 +24,11 @@ _STRATEGY_SEL_KEY = "sl_strategy_sel"
 
 
 _CHART_HEIGHT = 520
-# 详情大图窗口：与缩略图完全一致（240+60），echarts 有 dataZoom 可缩放
+# 详情大图视口：与缩略图完全一致，右侧另有 EXTRA_AFTER 根备用 bar
+# （加载但不出现在初始视图，详情页拖 dataZoom 可向右查看）
 _DETAIL_BEFORE = t.WINDOW_BEFORE
 _DETAIL_AFTER = t.WINDOW_AFTER
+_EXTRA_AFTER = 120
 
 
 @st.cache_data(ttl=600, max_entries=32, show_spinner=False)
@@ -37,8 +39,13 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         return None
     ex, sym, freq = parsed
     lookback = t.FREQ_LOOKBACK_DAYS.get(freq, t._DEFAULT_LOOKBACK_DAYS)
-    # 前瞻天数至少覆盖 _DETAIL_AFTER 根：复用缩略图的前瞻表（为其 WINDOW_AFTER 设计）
-    forward = max(t.FREQ_FORWARD_DAYS.get(freq, t._DEFAULT_FORWARD_DAYS), 30)
+    # 前瞻天数覆盖 视口 + 备用段：缩略图前瞻表按 WINDOW_AFTER 设计，按倍数放大
+    after_total = _DETAIL_AFTER + _EXTRA_AFTER
+    forward = max(
+        t.FREQ_FORWARD_DAYS.get(freq, t._DEFAULT_FORWARD_DAYS)
+        * after_total // t.WINDOW_AFTER,
+        30,
+    )
     start = pd.Timestamp(date) - pd.Timedelta(days=lookback)
     end = pd.Timestamp(date) + pd.Timedelta(days=forward)
     try:
@@ -52,7 +59,8 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         if prepared is None:
             return None
         bars, meta = prepared
-        window = t.slice_window(bars, date, before=_DETAIL_BEFORE, after=_DETAIL_AFTER)
+        # 多取 EXTRA_AFTER 根备用 bar（不进初始视口，dataZoom 可向右拖查看）
+        window = t.slice_window(bars, date, before=_DETAIL_BEFORE, after=after_total)
         if window is None or window.empty:
             return None
         labels = kc.date_labels(window["_x"], freq=freq)
@@ -71,10 +79,14 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
             labels=labels, ohlc=ohlc, volume=vol, ma_lines=ma_lines, macd=macd,
             has_volume=has_vol, signals=None, height=_CHART_HEIGHT, mark_date=date,
         )
-        # 共享管线默认 dataZoom start=55（K线页习惯看尾部），详情图要与缩略图
-        # bar 数一致，初始全量显示，用户仍可滚轮缩放
+        # 初始视口固定为 WINDOW_BEFORE+WINDOW_AFTER 根（与缩略图一致），
+        # 右侧备用 bar 不显示，拖 dataZoom slider / 滚轮可向右查看
+        visible_n = min(len(labels), _DETAIL_BEFORE + _DETAIL_AFTER)
         for zoom in option.get("dataZoom", []):
-            zoom["start"] = 0
+            zoom.pop("start", None)
+            zoom.pop("end", None)
+            zoom["startValue"] = 0
+            zoom["endValue"] = visible_n - 1
         charts = [{"id": "ch_case", "height": _CHART_HEIGHT, "option": option}]
         metas = {"ch_case": kc.build_chart_meta(labels, ohlc, ma_lines, [])}
         return kc.build_echarts_html(charts, metas)

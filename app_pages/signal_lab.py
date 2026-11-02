@@ -24,6 +24,9 @@ _STRATEGY_SEL_KEY = "sl_strategy_sel"
 
 
 _CHART_HEIGHT = 520
+# 详情大图窗口：与缩略图同量级（缩略图 240+60），echarts 有 dataZoom 可缩放
+_DETAIL_BEFORE = 300
+_DETAIL_AFTER = 60
 
 
 @st.cache_data(ttl=600, max_entries=32, show_spinner=False)
@@ -34,8 +37,10 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         return None
     ex, sym, freq = parsed
     lookback = t.FREQ_LOOKBACK_DAYS.get(freq, t._DEFAULT_LOOKBACK_DAYS)
+    # 前瞻天数至少覆盖 _DETAIL_AFTER 根：复用缩略图的前瞻表（为其 WINDOW_AFTER 设计）
+    forward = max(t.FREQ_FORWARD_DAYS.get(freq, t._DEFAULT_FORWARD_DAYS), 30)
     start = pd.Timestamp(date) - pd.Timedelta(days=lookback)
-    end = pd.Timestamp(date) + pd.Timedelta(days=30)
+    end = pd.Timestamp(date) + pd.Timedelta(days=forward)
     try:
         tags = build_kline_tags([sym], ex, kline_freq=t.DERIVED_FREQS.get(freq, freq))
         df = fetch_kline_dataframe(
@@ -47,7 +52,7 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         if prepared is None:
             return None
         bars, meta = prepared
-        window = t.slice_window(bars, date, before=150, after=40)
+        window = t.slice_window(bars, date, before=_DETAIL_BEFORE, after=_DETAIL_AFTER)
         if window is None or window.empty:
             return None
         labels = kc.date_labels(window["_x"], freq=freq)
@@ -90,7 +95,8 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
         return
     pos = ids.index(cur_id) if cur_id in ids else 0
 
-    left, right = st.columns([3, 2])
+    # 大图为主：图占 80%，字段面板收窄成一列
+    left, right = st.columns([4, 1])
     with left:
         html = _case_chart_html(case)
         if html:

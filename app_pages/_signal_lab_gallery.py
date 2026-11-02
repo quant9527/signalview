@@ -54,7 +54,7 @@ _HTML = "<div id=\"root\"></div>"
 
 _CSS = """
 #root{font-family:var(--st-font, sans-serif);color:var(--st-text-color)}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
 .card{position:relative;border-radius:12px;overflow:hidden;cursor:pointer;
   background:var(--st-secondary-background-color,#fff);
   border:1px solid var(--st-border-color,rgba(0,0,0,.08));

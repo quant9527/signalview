@@ -67,9 +67,10 @@ _CSS = """
 .badge{padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;
   letter-spacing:.04em;background:rgba(15,23,42,.72);color:#e2e8f0;
   backdrop-filter:blur(4px)}
-.badge-buy{color:#4ade80}.badge-sell{color:#f87171}
+/* 国内配色习惯：买入红、卖出绿 */
+.badge-buy{color:#f87171}.badge-sell{color:#4ade80}
 .badge-ignore{color:#cbd5e1}.badge-notbuy{color:#94a3b8}
-.badge-long{color:#60a5fa}
+.badge-long{color:#f87171}
 .badge-strat{color:#93c5fd;font-weight:500;letter-spacing:0}
 .hover{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   background:rgba(15,23,42,.45);opacity:0;transition:opacity .18s ease}

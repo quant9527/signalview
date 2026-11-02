@@ -7,10 +7,10 @@ from app_pages import _signal_lab_thumbs as t
 
 @pytest.fixture
 def bars() -> pd.DataFrame:
-    """200 根合成日 K：_x + OHLC + volume（覆盖 WINDOW_BEFORE+WINDOW_AFTER）。"""
+    """400 根合成日 K：_x + OHLC + volume（覆盖 WINDOW_BEFORE+WINDOW_AFTER）。"""
     rows = []
     base = pd.Timestamp("2025-01-01")
-    for i in range(200):
+    for i in range(400):
         o = 10.0 + i * 0.1
         rows.append({
             "_x": base + pd.Timedelta(days=i),

@@ -24,9 +24,9 @@ _STRATEGY_SEL_KEY = "sl_strategy_sel"
 
 
 _CHART_HEIGHT = 520
-# 详情大图窗口：与缩略图同量级（缩略图 240+60），echarts 有 dataZoom 可缩放
-_DETAIL_BEFORE = 300
-_DETAIL_AFTER = 60
+# 详情大图窗口：与缩略图完全一致（240+60），echarts 有 dataZoom 可缩放
+_DETAIL_BEFORE = t.WINDOW_BEFORE
+_DETAIL_AFTER = t.WINDOW_AFTER
 
 
 @st.cache_data(ttl=600, max_entries=32, show_spinner=False)
@@ -71,6 +71,10 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
             labels=labels, ohlc=ohlc, volume=vol, ma_lines=ma_lines, macd=macd,
             has_volume=has_vol, signals=None, height=_CHART_HEIGHT, mark_date=date,
         )
+        # 共享管线默认 dataZoom start=55（K线页习惯看尾部），详情图要与缩略图
+        # bar 数一致，初始全量显示，用户仍可滚轮缩放
+        for zoom in option.get("dataZoom", []):
+            zoom["start"] = 0
         charts = [{"id": "ch_case", "height": _CHART_HEIGHT, "option": option}]
         metas = {"ch_case": kc.build_chart_meta(labels, ohlc, ma_lines, [])}
         return kc.build_echarts_html(charts, metas)

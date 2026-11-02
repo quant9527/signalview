@@ -117,7 +117,8 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
             st.markdown(f"**{label}**")
             st.markdown(str(value))
 
-    prev_b, next_b, _ = st.columns([1, 1, 4])
+    # 翻页按钮：底部居中并排（左右留白对称）
+    _, prev_b, next_b, _ = st.columns([2, 1, 1, 2])
     # 更新 sl_case_id 后必须 scope="fragment" 重跑：弹窗 body 在按钮分支前已用旧值渲染完，
     # 只重跑弹窗 fragment 本身，不触发主脚本，X 关闭不误弹的行为不受影响
     if prev_b.button("← 上一个", key="sl_prev") and ids:

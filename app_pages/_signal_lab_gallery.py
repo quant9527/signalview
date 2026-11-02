@@ -63,12 +63,14 @@ _CSS = """
 .thumb{aspect-ratio:16/9;background:var(--st-secondary-background-color,#f5f5f5);position:relative}
 .thumb svg{width:100%;height:100%;display:block}
 .badges{position:absolute;top:10px;left:10px;display:flex;gap:6px}
-.badge{padding:2px 10px;border-radius:999px;
-  font-size:11px;font-weight:600;letter-spacing:.04em;color:#fff;background:#64748b}
-.badge-buy{background:#5f8d78}.badge-sell{background:#c0504d}
-.badge-ignore{background:#8a8f98}.badge-notbuy{background:#4b5563}
-.badge-long{background:#4a7bb5}
-.badge-strat{background:rgba(15,23,42,.72);font-weight:500;letter-spacing:0}
+/* 统一风格：同形同底（半透明深底），仅用文字颜色区分信号类型与策略名 */
+.badge{padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;
+  letter-spacing:.04em;background:rgba(15,23,42,.72);color:#e2e8f0;
+  backdrop-filter:blur(4px)}
+.badge-buy{color:#4ade80}.badge-sell{color:#f87171}
+.badge-ignore{color:#cbd5e1}.badge-notbuy{color:#94a3b8}
+.badge-long{color:#60a5fa}
+.badge-strat{color:#93c5fd;font-weight:500;letter-spacing:0}
 .hover{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   background:rgba(15,23,42,.45);opacity:0;transition:opacity .18s ease}
 .card:hover .hover{opacity:1}

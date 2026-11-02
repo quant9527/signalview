@@ -35,8 +35,9 @@ MARK_TOLERANCE_DAYS = 1.5
 # 派生频率：服务端不直接入库，取 1d 数据由服务端聚合
 DERIVED_FREQS = {"1w": "1d", "1M": "1d"}
 
-_UP = "#26a69a"
-_DOWN = "#ef5350"
+# 国内习惯：红涨绿跌
+_UP = "#ef5350"
+_DOWN = "#26a69a"
 _MARK = "#f59e0b"
 _MA5 = "#f5a623"
 _MA10 = "#4a90e2"

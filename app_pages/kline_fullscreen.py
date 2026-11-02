@@ -230,6 +230,7 @@ def _build_charts(
     start_d: date,
     end_d: date,
     all_signals: bool = False,
+    mark_date: str | None = None,
 ) -> tuple[list[dict], dict[str, dict], dict[str, int]]:
     """构建对比图 + 各标的图；返回 (chart_configs, metas, bar_counts)。"""
     visible_entries = [e for e in entries if e.freq is not None]
@@ -290,6 +291,7 @@ def _build_charts(
                 signals=signals or None,
                 height=chart_height,
                 boll_lines=boll_lines,
+                mark_date=mark_date,
             ),
         })
         metas[cid] = kc.build_chart_meta(labels, ohlc, ma_lines, signals, pct_change_list, boll_lines=boll_lines)
@@ -308,7 +310,7 @@ def _redirect_when_empty(raw_symbol: str) -> None:
 
 
 # K 线页业务状态全部挂在 URL query params 上；清空即回到默认状态。
-_KLINE_QUERY_KEYS = ("symbol", "start", "end", "all_signals")
+_KLINE_QUERY_KEYS = ("symbol", "start", "end", "all_signals", "signal_date")
 
 
 def _clear_to_default() -> None:
@@ -340,6 +342,8 @@ def page_kline_fullscreen() -> None:
     end_d = common.parse_iso_date(common.qp_str("end")) or default_end
     # 默认显示全部周期信号
     all_signals = True if "all_signals" not in st.query_params else common.qp_bool("all_signals")
+    # signal_date：信号标记（橙色虚线 + pin），格式 YYYY-MM-DD[ HH:MM]
+    mark_date = common.qp_str("signal_date") or None
     if start_d > end_d:
         st.error("开始日期不能晚于结束日期。")
         st.stop()
@@ -551,7 +555,9 @@ def page_kline_fullscreen() -> None:
             e.token for e in entries if e.freq is not None
         )
 
-    charts, metas, bar_counts = _build_charts(entries, frames, start_d, end_d, all_signals=all_signals)
+    charts, metas, bar_counts = _build_charts(
+        entries, frames, start_d, end_d, all_signals=all_signals, mark_date=mark_date
+    )
     if not charts:
         st.warning("未找到与请求匹配的标的行。")
         st.stop()

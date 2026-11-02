@@ -14,13 +14,14 @@ from app_pages._signal_lab_data import parse_code
 from app_pages.kline_charts import extract_symbol_data
 from flight_kline_client import build_kline_tags, fetch_kline_dataframe
 
-WINDOW_BEFORE = 240
-WINDOW_AFTER = 60
+# K线窗口（缩略图与详情大图共用同一语义，详情经 t.WINDOW_* 引用自动同步）
+WINDOW_BEFORE = 220
+WINDOW_AFTER = 40
 
 # freq -> 回看日历天数（保证能取到 WINDOW_BEFORE + WINDOW_AFTER 根）
 FREQ_LOOKBACK_DAYS = {
-    "15m": 22, "30m": 45, "1h": 90, "2h": 180, "4h": 360,
-    "1d": 500, "1w": 2800, "1M": 6000,
+    "15m": 18, "30m": 34, "1h": 68, "2h": 136, "4h": 272,
+    "1d": 400, "1w": 2800, "1M": 6000,
 }
 _DEFAULT_LOOKBACK_DAYS = 500
 # freq -> 前瞻日历天数（保证案例日之后能取满 WINDOW_AFTER 根走势）
@@ -40,7 +41,7 @@ _MARK = "#f59e0b"
 _MA5 = "#f5a623"
 _MA10 = "#4a90e2"
 # 缩略图 viewBox（16:9，与卡片 thumb aspect-ratio 匹配）
-_WIDTH, _HEIGHT = 720, 405
+_WIDTH, _HEIGHT = 640, 360
 # 三区高度占比：K线主图 / 成交量 / MACD（剩余为区间隔）
 _K_RATIO, _VOL_RATIO = 0.58, 0.14
 

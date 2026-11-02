@@ -136,12 +136,15 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
 def _topbar(cases: list[dict]) -> None:
     n_cases = len(cases)
     n_signals = len(d.signal_options(cases))
+    # K 线窗口根数与缩略图/详情大图共用同一常量，改 t.WINDOW_* 此处自动同步
     st.markdown(
         f"""
         <div style="padding:.25rem 0 .5rem 0;display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap">
           <span style="font-size:1.6rem;font-weight:700;letter-spacing:.35em">SIGNAL LAB</span>
           <span style="font-size:.85rem;opacity:.65">策略案例图库</span>
-          <span style="font-size:.8rem;opacity:.5;margin-left:auto">{n_cases} 个案例 · {n_signals} 类信号</span>
+          <span style="font-size:.8rem;opacity:.5;margin-left:auto">
+            {n_cases} 个案例 · {n_signals} 类信号 · K线窗口 {t.WINDOW_BEFORE}+{t.WINDOW_AFTER} 根
+          </span>
         </div>
         """,
         unsafe_allow_html=True,

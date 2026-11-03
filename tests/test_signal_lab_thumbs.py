@@ -7,10 +7,10 @@ from app_pages import _signal_lab_thumbs as t
 
 @pytest.fixture
 def bars() -> pd.DataFrame:
-    """80 根合成日 K：_x + OHLC + volume。"""
+    """400 根合成日 K：_x + OHLC + volume（覆盖 WINDOW_BEFORE+WINDOW_AFTER）。"""
     rows = []
     base = pd.Timestamp("2025-01-01")
-    for i in range(80):
+    for i in range(400):
         o = 10.0 + i * 0.1
         rows.append({
             "_x": base + pd.Timedelta(days=i),
@@ -55,6 +55,32 @@ def test_render_candle_svg_skips_nan_rows(bars):
     svg = t.render_candle_svg(bars, "2025-03-01")
     assert svg is not None
     assert "nan" not in svg
+
+
+def test_render_candle_svg_with_indicators(bars):
+    # 带 MA/MACD 列：折线与 MACD 柱都渲染出来
+    bars = bars.copy()
+    bars["ma5"] = bars["close"].rolling(5).mean()
+    bars["ma10"] = bars["close"].rolling(10).mean()
+    bars["_macd_dif"] = bars["close"] * 0.01
+    bars["_macd_dea"] = bars["close"] * 0.008
+    bars["_macd_hist"] = (bars["close"] * 0.002).where(
+        bars.index % 2 == 0, -bars["close"] * 0.002
+    )
+    svg = t.render_candle_svg(bars, "2025-03-01")
+    assert svg is not None
+    assert svg.count("<polyline") >= 4  # MA5/MA10 + DIF/DEA
+    assert f'viewBox="0 0 {t._WIDTH} {t._HEIGHT}"' in svg
+
+
+def test_render_candle_svg_nan_indicators_skipped(bars):
+    # 指标列含 NaN 不产生 "nan" 字符串；全 NaN 的指标列不渲染对应线
+    bars = bars.copy()
+    bars["ma5"] = float("nan")
+    bars.loc[5, "ma10"] = float("nan")
+    bars["_macd_dif"] = float("nan")
+    svg = t.render_candle_svg(bars, "2025-03-01")
+    assert svg is not None and "nan" not in svg
 
 
 def test_placeholder_svg():

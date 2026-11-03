@@ -40,9 +40,9 @@ def _fmt_price(v: float) -> float:
     fv = float(v)
     return round(fv, 2) if fv >= 1 else fv
 
-# Kline.html 调色板
-UP_COLOR = "#26a69a"
-DOWN_COLOR = "#ef5350"
+# Kline.html 调色板（国内习惯：红涨绿跌）
+UP_COLOR = "#ef5350"
+DOWN_COLOR = "#26a69a"
 BORDER_COLOR = "#2b333d"
 MUTED_COLOR = "#8b949e"
 SPLIT_COLOR = "#1c232b"
@@ -580,6 +580,25 @@ def _macd_series(
     ]
 
 
+def _resolve_mark_label(labels: list[str], mark_date: str | None) -> str | None:
+    """把 signal_date 参数解析为横轴上实际存在的标签。
+
+    精确匹配优先；否则取 <= mark_date 的最近一个（信号时间落在两根 bar 之间时
+    指向前一根）。labels 为升序。
+    """
+    if not mark_date:
+        return None
+    if mark_date in labels:
+        return mark_date
+    prev = None
+    for v in labels:
+        if v <= mark_date:
+            prev = v
+        else:
+            break
+    return prev
+
+
 def build_symbol_candle_option(
     title: str,
     labels: list[str],
@@ -591,8 +610,13 @@ def build_symbol_candle_option(
     signals: list[dict] | None = None,
     height: int = 600,
     boll_lines: list[dict[str, Any]] | None = None,
+    mark_date: str | None = None,
 ) -> dict:
-    """单个标的的 K 线 + 成交量 + MACD + 布林带 + 信号箭头（Kline.html 风格）。"""
+    """单个标的的 K 线 + 成交量 + MACD + 布林带 + 信号箭头（Kline.html 风格）。
+
+    mark_date（URL 参数 signal_date）：在对应 bar 上叠加橙色虚线 + pin 指示器，
+    用于案例图/复盘时定位信号时间点。
+    """
     has_macd = macd is not None
     grids = _kline_grids(has_volume, has_macd, height)
     n_grids = len(grids)
@@ -667,6 +691,33 @@ def build_symbol_candle_option(
 
     series.extend(_build_signal_arrow_series(signals or [], ohlc))
 
+    # signal_date 标记：橙色虚线 + pin，落在主图 K 线 series 上
+    hit = _resolve_mark_label(labels, mark_date)
+    if hit:
+        lo = min((b[2] for b in ohlc if b), default=0)
+        series[0]["markLine"] = {
+            "symbol": "none",
+            "silent": True,
+            "animation": False,
+            "lineStyle": {"color": "#ffb84d", "type": "dashed", "width": 2},
+            "label": {
+                "formatter": "信号",
+                "color": "#ffb84d",
+                "position": "insideEndTop",
+                "fontSize": 12,
+            },
+            "data": [{"xAxis": hit}],
+        }
+        series[0]["markPoint"] = {
+            "silent": True,
+            "animation": False,
+            "symbol": "pin",
+            "symbolSize": 38,
+            "itemStyle": {"color": "#ffb84d"},
+            "label": {"color": "#1c232b", "fontSize": 11, "fontWeight": 700},
+            "data": [{"coord": [hit, lo], "value": "信号"}],
+        }
+
     legend_names = ["K线"] + [m["name"] for m in ma_lines] + [b["name"] for b in boll_lines or []]
     if has_volume:
         legend_names.append("成交量")
@@ -732,7 +783,7 @@ def build_symbol_candle_option(
 # ===========================================================
 
 _TIP_JS = """
-var UP='#26a69a', DOWN='#ef5350', BORDER='#2b333d', MUTED='#8b949e';
+var UP='#ef5350', DOWN='#26a69a', BORDER='#2b333d', MUTED='#8b949e';
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function klineAxisTip(params, meta){
     var p=null, i;
@@ -786,7 +837,7 @@ function klineAxisTip(params, meta){
 
 _PAGE_CSS = """
 :root{--bg:#0f1419;--panel:#161b22;--border:#2b333d;--text:#c9d1d9;--muted:#8b949e;
---up:#26a69a;--down:#ef5350;}
+--up:#ef5350;--down:#26a69a;}
 *{box-sizing:border-box;}
 html,body{margin:0;background:var(--bg);color:var(--text);
 font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;}

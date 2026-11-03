@@ -54,7 +54,7 @@ _HTML = "<div id=\"root\"></div>"
 
 _CSS = """
 #root{font-family:var(--st-font, sans-serif);color:var(--st-text-color)}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
 .card{position:relative;border-radius:12px;overflow:hidden;cursor:pointer;
   background:var(--st-secondary-background-color,#fff);
   border:1px solid var(--st-border-color,rgba(0,0,0,.08));
@@ -62,11 +62,16 @@ _CSS = """
 .card:hover{box-shadow:0 8px 24px rgba(0,0,0,.12);transform:translateY(-2px)}
 .thumb{aspect-ratio:16/9;background:var(--st-secondary-background-color,#f5f5f5);position:relative}
 .thumb svg{width:100%;height:100%;display:block}
-.badge{position:absolute;top:10px;left:10px;padding:2px 10px;border-radius:999px;
-  font-size:11px;font-weight:600;letter-spacing:.04em;color:#fff;background:#64748b}
-.badge-buy{background:#5f8d78}.badge-sell{background:#c0504d}
-.badge-ignore{background:#8a8f98}.badge-notbuy{background:#4b5563}
-.badge-long{background:#4a7bb5}
+.badges{position:absolute;top:10px;left:10px;display:flex;gap:6px}
+/* 统一风格：同形同底（半透明深底），仅用文字颜色区分信号类型与策略名 */
+.badge{padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;
+  letter-spacing:.04em;background:rgba(15,23,42,.72);color:#e2e8f0;
+  backdrop-filter:blur(4px)}
+/* 国内配色习惯：买入红、卖出绿 */
+.badge-buy{color:#f87171}.badge-sell{color:#4ade80}
+.badge-ignore{color:#cbd5e1}.badge-notbuy{color:#94a3b8}
+.badge-long{color:#f87171}
+.badge-strat{color:#93c5fd;font-weight:500;letter-spacing:0}
 .hover{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   background:rgba(15,23,42,.45);opacity:0;transition:opacity .18s ease}
 .card:hover .hover{opacity:1}
@@ -78,10 +83,6 @@ _CSS = """
 .code{font-family:var(--st-mono-font,monospace);font-size:11px;opacity:.9}
 .info{display:flex;align-items:flex-start;gap:6px;margin-top:7px;font-size:12px;
   opacity:.85;line-height:1.5}
-.strat{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;
-  color:var(--st-primary-color,#4a7bb5);
-  background:color-mix(in srgb,var(--st-primary-color,#4a7bb5) 12%,transparent)}
 .itext{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;
   font-size:13px;opacity:.85}
@@ -107,17 +108,16 @@ export default function (component) {
       ${cards.map((c) => `
         <div class="card" data-id="${esc(c.id)}">
           <div class="thumb">${c.thumb || ""}
-            <span class="badge badge-${esc(c.signalClass)}">${esc(c.signal)}</span>
+            <div class="badges">
+              <span class="badge badge-${esc(c.signalClass)}">${esc(c.signal)}</span>
+              ${c.strategy ? `<span class="badge badge-strat" title="${esc(c.strategy)}">${esc(c.strategy)}</span>` : ""}
+            </div>
             <div class="hover"><span>查看详情</span></div>
           </div>
           <div class="meta">
             <div class="name">${esc(c.name)}</div>
             <div class="sub"><span class="code">${esc(c.code)}</span><span>${esc(c.dateLabel)}</span></div>
-            ${c.strategy || c.info ? `
-            <div class="info">
-              ${c.strategy ? `<span class="strat" title="${esc(c.strategy)}">${esc(c.strategy)}</span>` : ""}
-              ${c.info ? `<span class="itext" title="${esc(c.info)}">${esc(c.info)}</span>` : ""}
-            </div>` : ""}
+            ${c.info ? `<div class="info"><span class="itext" title="${esc(c.info)}">${esc(c.info)}</span></div>` : ""}
           </div>
         </div>`).join("")}
     </div>

@@ -24,6 +24,11 @@ _STRATEGY_SEL_KEY = "sl_strategy_sel"
 
 
 _CHART_HEIGHT = 520
+# 详情大图视口：与缩略图完全一致，右侧另有 EXTRA_AFTER 根备用 bar
+# （加载但不出现在初始视图，详情页拖 dataZoom 可向右查看）
+_DETAIL_BEFORE = t.WINDOW_BEFORE
+_DETAIL_AFTER = t.WINDOW_AFTER
+_EXTRA_AFTER = 120
 
 
 @st.cache_data(ttl=600, max_entries=32, show_spinner=False)
@@ -34,8 +39,15 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         return None
     ex, sym, freq = parsed
     lookback = t.FREQ_LOOKBACK_DAYS.get(freq, t._DEFAULT_LOOKBACK_DAYS)
+    # 前瞻天数覆盖 视口 + 备用段：缩略图前瞻表按 WINDOW_AFTER 设计，按倍数放大
+    after_total = _DETAIL_AFTER + _EXTRA_AFTER
+    forward = max(
+        t.FREQ_FORWARD_DAYS.get(freq, t._DEFAULT_FORWARD_DAYS)
+        * after_total // t.WINDOW_AFTER,
+        30,
+    )
     start = pd.Timestamp(date) - pd.Timedelta(days=lookback)
-    end = pd.Timestamp(date) + pd.Timedelta(days=30)
+    end = pd.Timestamp(date) + pd.Timedelta(days=forward)
     try:
         tags = build_kline_tags([sym], ex, kline_freq=t.DERIVED_FREQS.get(freq, freq))
         df = fetch_kline_dataframe(
@@ -47,7 +59,8 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         if prepared is None:
             return None
         bars, meta = prepared
-        window = t.slice_window(bars, date, before=150, after=40)
+        # 多取 EXTRA_AFTER 根备用 bar（不进初始视口，dataZoom 可向右拖查看）
+        window = t.slice_window(bars, date, before=_DETAIL_BEFORE, after=after_total)
         if window is None or window.empty:
             return None
         labels = kc.date_labels(window["_x"], freq=freq)
@@ -66,6 +79,14 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
             labels=labels, ohlc=ohlc, volume=vol, ma_lines=ma_lines, macd=macd,
             has_volume=has_vol, signals=None, height=_CHART_HEIGHT, mark_date=date,
         )
+        # 初始视口固定为 WINDOW_BEFORE+WINDOW_AFTER 根（与缩略图一致），
+        # 右侧备用 bar 不显示，拖 dataZoom slider / 滚轮可向右查看
+        visible_n = min(len(labels), _DETAIL_BEFORE + _DETAIL_AFTER)
+        for zoom in option.get("dataZoom", []):
+            zoom.pop("start", None)
+            zoom.pop("end", None)
+            zoom["startValue"] = 0
+            zoom["endValue"] = visible_n - 1
         charts = [{"id": "ch_case", "height": _CHART_HEIGHT, "option": option}]
         metas = {"ch_case": kc.build_chart_meta(labels, ohlc, ma_lines, [])}
         return kc.build_echarts_html(charts, metas)
@@ -90,7 +111,8 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
         return
     pos = ids.index(cur_id) if cur_id in ids else 0
 
-    left, right = st.columns([3, 2])
+    # 大图为主：图占 80%，字段面板收窄成一列
+    left, right = st.columns([4, 1])
     with left:
         html = _case_chart_html(case)
         if html:
@@ -111,7 +133,8 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
             st.markdown(f"**{label}**")
             st.markdown(str(value))
 
-    prev_b, next_b, _ = st.columns([1, 1, 4])
+    # 翻页按钮：底部居中并排（左右留白对称）
+    _, prev_b, next_b, _ = st.columns([2, 1, 1, 2])
     # 更新 sl_case_id 后必须 scope="fragment" 重跑：弹窗 body 在按钮分支前已用旧值渲染完，
     # 只重跑弹窗 fragment 本身，不触发主脚本，X 关闭不误弹的行为不受影响
     if prev_b.button("← 上一个", key="sl_prev") and ids:
@@ -125,12 +148,15 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
 def _topbar(cases: list[dict]) -> None:
     n_cases = len(cases)
     n_signals = len(d.signal_options(cases))
+    # K 线窗口根数与缩略图/详情大图共用同一常量，改 t.WINDOW_* 此处自动同步
     st.markdown(
         f"""
         <div style="padding:.25rem 0 .5rem 0;display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap">
           <span style="font-size:1.6rem;font-weight:700;letter-spacing:.35em">SIGNAL LAB</span>
           <span style="font-size:.85rem;opacity:.65">策略案例图库</span>
-          <span style="font-size:.8rem;opacity:.5;margin-left:auto">{n_cases} 个案例 · {n_signals} 类信号</span>
+          <span style="font-size:.8rem;opacity:.5;margin-left:auto">
+            {n_cases} 个案例 · {n_signals} 类信号 · K线窗口 {t.WINDOW_BEFORE}+{t.WINDOW_AFTER} 根
+          </span>
         </div>
         """,
         unsafe_allow_html=True,

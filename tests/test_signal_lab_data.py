@@ -20,6 +20,32 @@ def cases() -> list[dict]:
     ]
 
 
+def test_fmt_ts_uses_shanghai_clock():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    utc = datetime(2026, 11, 3, 12, 8, tzinfo=ZoneInfo("UTC"))
+    assert d._fmt_ts(utc) == "2026-11-03 20:08"
+    assert d._fmt_ts(None) == ""
+
+
+def test_format_case_when_always_includes_clock():
+    from app_pages.signal_lab import format_case_when
+
+    assert format_case_when("2026-04-03", "2026-04-03 10:30") == "2026.04.03 10:30"
+    assert format_case_when("2026-04-03", "2026-04-03 15:00") == "2026.04.03 15:00"
+    assert format_case_when("2026-04-03", None) == "2026.04.03"
+
+
+def test_parse_case_when_accepts_dotted_clock():
+    from datetime import datetime
+
+    from app_pages.signal_lab import parse_case_when
+
+    assert parse_case_when("2026.04.03 10:30") == datetime(2026, 4, 3, 10, 30)
+    assert parse_case_when("2026.04.03") == datetime(2026, 4, 3)
+
+
 def test_parse_code_valid():
     assert d.parse_code("as:000993:1h") == ("as", "000993", "1h")
     assert d.parse_code("asindex:sz399006:2h") == ("asindex", "sz399006", "2h")
@@ -59,12 +85,54 @@ def test_strategy_and_signal_options(cases):
 
 
 def test_rows_to_cases_maps_db_row():
-    rows = [("r1", "闽东电力", date(2025, 7, 27), "as:000993:1h",
-             "BUY", "bc_xd4", "info", "note")]
+    from datetime import datetime
+
+    rows = [(
+        "r1", "闽东电力", date(2025, 7, 27), "as:000993:1h",
+        "BUY", "bc_xd4", "info", "note", datetime(2025, 7, 27, 10, 30),
+    )]
     out = d._rows_to_cases(rows)
-    assert out == [{"id": "r1", "name": "闽东电力", "date": "2025-07-27",
-                    "code": "as:000993:1h", "signal": "BUY",
-                    "strategy": "bc_xd4", "info": "info", "note": "note"}]
+    assert out == [{
+        "id": "r1", "name": "闽东电力", "date": "2025-07-27",
+        "code": "as:000993:1h", "signal": "BUY",
+        "strategy": "bc_xd4", "info": "info", "note": "note",
+        "at": "2025-07-27 10:30",
+    }]
+
+
+def test_rows_to_cases_without_clock():
+    rows = [("r1", "闽东电力", date(2025, 7, 27), "as:000993:1h",
+             "BUY", "bc_xd4", "info", "note", None)]
+    assert d._rows_to_cases(rows)[0]["at"] == ""
+
+
+def test_prepare_new_case_checks_name_code_and_strategy():
+    from datetime import datetime
+
+    when = datetime(2026, 4, 3, 10, 30, 15)
+    with pytest.raises(ValueError, match="案例名称"):
+        d.prepare_new_case("  ", "as:688549:1h", "bc", "BUY", when, strategy_known=True)
+    with pytest.raises(ValueError, match="标的代码"):
+        d.prepare_new_case("中巨芯", "688549", "bc", "BUY", when, strategy_known=True)
+    with pytest.raises(ValueError, match="不存在"):
+        d.prepare_new_case("中巨芯", "as:688549:1h", "nope", "BUY", when, strategy_known=False)
+    out = d.prepare_new_case(
+        " 中巨芯 ", " as:688549:1h ", " bc_xd4_macd ", "BUY", when,
+        info=" i ", note=" ", strategy_known=True,
+    )
+    assert out["name"] == "中巨芯"
+    assert out["code"] == "as:688549:1h"
+    assert out["strategy"] == "bc_xd4_macd"
+    assert out["when"] == datetime(2026, 4, 3, 10, 30)
+    assert out["info"] == "i" and out["note"] == ""
+
+
+def test_checked_strategy_name_rejects_unknown():
+    import pytest
+
+    assert d.checked_strategy_name(" bc_xd4_macd ", True) == "bc_xd4_macd"
+    with pytest.raises(ValueError, match="不存在"):
+        d.checked_strategy_name("no_such", False)
 
 
 def test_rows_to_cases_nulls_become_empty():

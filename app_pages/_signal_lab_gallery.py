@@ -77,10 +77,11 @@ _CSS = """
 .card:hover .hover{opacity:1}
 .hover span{color:#fff;font-size:13px;border:1px solid rgba(255,255,255,.7);
   border-radius:999px;padding:4px 14px}
-.meta{padding:10px 12px 12px}
-.name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sub{display:flex;align-items:baseline;gap:6px;margin-top:3px;font-size:12px;opacity:.65}
-.code{font-family:var(--st-mono-font,monospace);font-size:11px;opacity:.9}
+.meta{padding:8px 12px 10px}
+.line{display:flex;align-items:baseline;gap:8px;min-width:0}
+.name{min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.code{flex:none;font-family:var(--st-mono-font,monospace);font-size:11px;opacity:.65;white-space:nowrap}
+.date{margin-left:auto;flex:none;font-size:12px;opacity:.65;white-space:nowrap}
 .info{display:flex;align-items:flex-start;gap:6px;margin-top:7px;font-size:12px;
   opacity:.85;line-height:1.5}
 .itext{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -115,8 +116,11 @@ export default function (component) {
             <div class="hover"><span>查看详情</span></div>
           </div>
           <div class="meta">
-            <div class="name">${esc(c.name)}</div>
-            <div class="sub"><span class="code">${esc(c.code)}</span><span>${esc(c.dateLabel)}</span></div>
+            <div class="line">
+              <span class="name">${esc(c.name)}</span>
+              <span class="code">${esc(c.code)}</span>
+              <span class="date">${esc(c.dateLabel)}</span>
+            </div>
             ${c.info ? `<div class="info"><span class="itext" title="${esc(c.info)}">${esc(c.info)}</span></div>` : ""}
           </div>
         </div>`).join("")}

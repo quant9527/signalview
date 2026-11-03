@@ -302,7 +302,14 @@ def main() -> int:
             return 1
         # 简单视图，已部署进程仍按旧表名查询
         cur.execute("DROP VIEW IF EXISTS signal_lab_case")
-        cur.execute("CREATE VIEW signal_lab_case AS SELECT * FROM strategy_case")
+        cur.execute(
+            """
+            CREATE VIEW signal_lab_case AS
+            SELECT id, name, signal_date, symbol_id, signal, strategy, info, note,
+                   created_at, updated_at
+            FROM strategy_case
+            """
+        )
         cur.execute("SELECT count(*) FROM strategy")
         n_strategy = cur.fetchone()[0]
         cur.execute("SELECT count(*) FROM strategy_case")

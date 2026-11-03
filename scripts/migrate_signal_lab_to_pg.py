@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS strategy_case (
     id          text PRIMARY KEY,
     name        text NOT NULL DEFAULT '',
     signal_date date NOT NULL,
+    signal_at   timestamp,
     symbol_id   text NOT NULL,
     signal      text NOT NULL DEFAULT '',
     strategy    text NOT NULL DEFAULT '',
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS strategy_case (
 );
 CREATE INDEX IF NOT EXISTS idx_strategy_case_date
     ON strategy_case (signal_date DESC);
+ALTER TABLE strategy_case ADD COLUMN IF NOT EXISTS signal_at timestamp;
 """
 
 UPSERT = """

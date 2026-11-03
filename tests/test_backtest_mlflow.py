@@ -1,7 +1,15 @@
 """MLflow 成交表映射到案例卡片。"""
 import pandas as pd
 
-from app_pages.backtest_mlflow import kline_code, trades_to_cases
+from app_pages.backtest_mlflow import kline_code, replace_database, trades_to_cases
+
+
+def test_replace_database_keeps_credentials():
+    url = "postgresql://postgres:secret@127.0.0.1:5432/quant?sslmode=disable"
+    assert (
+        replace_database(url, "mlflow")
+        == "postgresql://postgres:secret@127.0.0.1:5432/mlflow?sslmode=disable"
+    )
 
 
 def test_kline_code_strips_signal_and_reverse():

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import html
 from collections.abc import Callable
+from datetime import datetime, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -35,13 +36,25 @@ _DETAIL_AFTER = t.WINDOW_AFTER
 _EXTRA_AFTER = 120
 
 
+def format_case_when(date: str, bar_ts) -> str:
+    """案例详情的时间，一律 YYYY.MM.DD HH:MM。没有 K 线时只显示日期。"""
+    if bar_ts is None or pd.isna(bar_ts):
+        return str(date)[:10].replace("-", ".")
+    return pd.Timestamp(bar_ts).strftime("%Y.%m.%d %H:%M")
+
+
 @st.cache_data(ttl=600, max_entries=32, show_spinner=False)
-def _case_chart_html_cached(code: str, date: str) -> str | None:
-    """详情弹窗的完整 echarts K 线 HTML（按 code+date 缓存）；拉不到数据返回 None。"""
+def _case_chart_html_cached(code: str, date: str, at: str = "") -> tuple[str | None, str]:
+    """详情 K 线 HTML 和详情里要显示的时间。拉不到数据时 HTML 为 None。
+
+    at 是已保存的案例时间（YYYY-MM-DD HH:MM）。有它时标记落在这个时刻，
+    没有时仍按当天 K 线锚定。
+    """
     parsed = d.parse_code(code)
     if parsed is None:
-        return None
+        return None, format_case_when(date, None)
     ex, sym, freq = parsed
+    fallback = format_case_when(date, None)
     lookback = t.FREQ_LOOKBACK_DAYS.get(freq, t._DEFAULT_LOOKBACK_DAYS)
     # 前瞻天数覆盖 视口 + 备用段：缩略图前瞻表按 WINDOW_AFTER 设计，按倍数放大
     after_total = _DETAIL_AFTER + _EXTRA_AFTER
@@ -61,12 +74,26 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         )
         prepared = kc.extract_symbol_data(df, sym, exchange=ex) if df is not None else None
         if prepared is None:
-            return None
+            return None, fallback
         bars, meta = prepared
         # 多取 EXTRA_AFTER 根备用 bar（不进初始视口，dataZoom 可向右拖查看）
-        window = t.slice_window(bars, date, before=_DETAIL_BEFORE, after=after_total)
+        stored = pd.Timestamp(at) if at else None
+        window = t.slice_window(
+            bars, at or date, before=_DETAIL_BEFORE, after=after_total,
+        )
         if window is None or window.empty:
-            return None
+            return None, format_case_when(date, stored) if stored is not None else fallback
+        if stored is not None:
+            target = stored
+            pool = window
+        else:
+            target = pd.Timestamp(date)
+            # 案例只存了日期。优先落在当天的 K 线上，避免午夜就近落到前一根日终 bar。
+            same_day = window["_x"].dt.normalize() == target.normalize()
+            pool = window.loc[same_day] if bool(same_day.any()) else window
+        anchor = pool.loc[(pool["_x"] - target).abs().idxmin(), "_x"]
+        when = format_case_when(date, stored if stored is not None else anchor)
+        mark = kc.date_labels(pd.Series([pd.Timestamp(anchor)]), freq=freq)[0]
         labels = kc.date_labels(window["_x"], freq=freq)
         ohlc = kc.to_echarts_ohlc(window)
         vol = kc.to_echarts_volume(window)
@@ -81,7 +108,7 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
         option = kc.build_symbol_candle_option(
             title=title,
             labels=labels, ohlc=ohlc, volume=vol, ma_lines=ma_lines, macd=macd,
-            has_volume=has_vol, signals=None, height=_CHART_HEIGHT, mark_date=date,
+            has_volume=has_vol, signals=None, height=_CHART_HEIGHT, mark_date=mark,
         )
         # 初始视口固定为 WINDOW_BEFORE+WINDOW_AFTER 根（与缩略图一致），
         # 右侧备用 bar 不显示，拖 dataZoom slider / 滚轮可向右查看
@@ -93,48 +120,148 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
             zoom["endValue"] = visible_n - 1
         charts = [{"id": "ch_case", "height": _CHART_HEIGHT, "option": option}]
         metas = {"ch_case": kc.build_chart_meta(labels, ohlc, ma_lines, [])}
-        return kc.build_echarts_html(charts, metas, embedded=True)
+        return kc.build_echarts_html(charts, metas, embedded=True), when
     except Exception as e:
         print(f"[SignalLab] chart failed for {code}: {e}")
-        return None
+        return None, fallback
 
 
-def _case_chart_html(case: dict) -> str | None:
-    """薄封装：按案例的 code+date 走缓存渲染详情 K 线。"""
-    return _case_chart_html_cached(str(case["code"]), str(case["date"]))
+def _case_chart_html(case: dict) -> tuple[str | None, str]:
+    """详情 K 线，以及右侧「日期」要显示的时间。"""
+    return _case_chart_html_cached(
+        str(case["code"]), str(case["date"]), str(case.get("at") or ""),
+    )
 
 
-@st.dialog("案例详情", width="large")
+def parse_case_when(text: str) -> datetime:
+    """详情里的时间文本 -> datetime。支持 2026.04.03 10:30 和只有日期。"""
+    raw = str(text).strip().replace(".", "-")
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"无法识别的时间：{text}")
+
+
+def _live_case(case_id: str, fallback: dict | None) -> dict | None:
+    """优先读刚写过的案例。缓存未清时退回打开弹窗时的那份。"""
+    try:
+        for item in d.get_cases():
+            if item["id"] == case_id:
+                return item
+    except ValueError:
+        pass
+    return fallback
+
+
+def _dismiss_case_dialog() -> None:
+    st.session_state["sl_dialog_open"] = False
+    st.session_state["sl_edit"] = ""
+
+
+def _cancel_edit(case_id: str) -> None:
+    st.session_state["sl_edit"] = ""
+    st.session_state.pop(f"sl_when_input_{case_id}", None)
+
+
+def _open_editor(case_id: str, field: str) -> None:
+    st.session_state["sl_edit"] = f"{case_id}:{field}"
+    st.rerun(scope="fragment")
+
+
+def _field_button(label: str, value: str, case_id: str, field: str) -> None:
+    """未编辑时，点字段值进入编辑。"""
+    st.markdown(f"**{label}**")
+    if st.button(
+        value or "—",
+        key=f"sl_open_{field}_{case_id}",
+        type="tertiary",
+        help="点击修改",
+        width="stretch",
+    ):
+        _open_editor(case_id, field)
+
+
+def _save_editor(case_id: str, action) -> None:
+    """执行保存。失败时把错误留在弹窗里，不退出编辑。"""
+    try:
+        action()
+    except ValueError as e:
+        st.error(str(e))
+        return
+    st.session_state["sl_edit"] = ""
+    _case_chart_html_cached.clear()
+    st.rerun()
+
+
+def _edit_when(case: dict, shown: str) -> None:
+    case_id = case["id"]
+    if st.session_state.get("sl_edit") != f"{case_id}:when":
+        _field_button("日期", shown, case_id, "when")
+        return
+    st.markdown("**日期**")
+    widget_key = f"sl_when_input_{case_id}"
+    if widget_key not in st.session_state:
+        st.session_state[widget_key] = parse_case_when(shown)
+    with st.form(f"sl_when_form_{case_id}"):
+        picked = st.datetime_input(
+            "日期",
+            key=widget_key,
+            step=timedelta(minutes=1),
+            label_visibility="collapsed",
+        )
+        submitted = st.form_submit_button("保存", type="primary", width="stretch")
+    if st.button(
+        "取消", key=f"sl_when_cancel_{case_id}", width="stretch",
+        on_click=_cancel_edit, args=(case_id,),
+    ):
+        st.rerun(scope="fragment")
+    if submitted:
+        _save_editor(case_id, lambda: d.update_case_when(case_id, picked))
+
+
+@st.dialog("案例详情", width="large", on_dismiss=_dismiss_case_dialog)
 def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
     """详情弹窗；底部在 sl_case_ids 内循环翻动。"""
     cur_id = st.session_state.get("sl_case_id", "")
     ids = st.session_state.get("sl_case_ids", [])
-    case = cases_lookup.get(cur_id)
+    case = _live_case(cur_id, cases_lookup.get(cur_id))
     if case is None:
         st.warning("案例不存在，可能数据已更新。")
         return
+    edit = st.session_state.get("sl_edit") or ""
+    if edit and not edit.startswith(f"{cur_id}:"):
+        st.session_state["sl_edit"] = ""
     pos = ids.index(cur_id) if cur_id in ids else 0
+    editable = bool(st.session_state.get("sl_case_editable"))
 
     # 大图为主：图占 80%，字段面板收窄成一列
     left, right = st.columns([4, 1])
     with left:
-        html = _case_chart_html(case)
-        if html:
+        html_doc, when = _case_chart_html(case)
+        if html_doc:
             # 边框各 1px，框高略大于图表，避免缩放条被切掉
-            components_v1.html(html, height=_CHART_HEIGHT + 2, scrolling=False)
+            components_v1.html(html_doc, height=_CHART_HEIGHT + 2, scrolling=False)
         else:
             st.info("K 线数据暂不可用（标的代码无法解析或数据源无此合约）。")
+    shown = case["at"].replace("-", ".") if case.get("at") else when
     with right:
         st.markdown(f"#### {case['name']}")
-        rows = [
-            ("日期", case["date"].replace("-", ".")),
-            ("标的代码", f"`{case['code']}`"),
-            ("策略", case["strategy"] or "—"),
+        if editable:
+            _edit_when(case, shown)
+        else:
+            st.markdown("**日期**")
+            st.markdown(str(shown))
+        st.markdown("**标的代码**")
+        st.markdown(f"`{case['code']}`")
+        st.markdown("**策略**")
+        st.markdown(case["strategy"] or "—")
+        for label, value in (
             ("信号", case["signal"]),
             ("信息", case["info"] or "—"),
             ("注意点", case["note"] or "—"),
-        ]
-        for label, value in rows:
+        ):
             st.markdown(f"**{label}**")
             st.markdown(str(value))
 
@@ -144,10 +271,33 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
     # 只重跑弹窗 fragment 本身，不触发主脚本，X 关闭不误弹的行为不受影响
     if prev_b.button("← 上一个", key="sl_prev") and ids:
         st.session_state["sl_case_id"] = ids[(pos - 1) % len(ids)]
+        st.session_state["sl_edit"] = ""
         st.rerun(scope="fragment")
     if next_b.button("下一个 →", key="sl_next") and ids:
         st.session_state["sl_case_id"] = ids[(pos + 1) % len(ids)]
+        st.session_state["sl_edit"] = ""
         st.rerun(scope="fragment")
+
+
+def _strategy_panel(name: str) -> None:
+    """指定策略页展示 strategy 表：核心思想、创建和更新时间。"""
+    try:
+        row = d.get_strategy(name)
+    except ValueError as e:
+        st.warning(str(e))
+        return
+    if row is None:
+        st.caption("策略表里没有这条说明。")
+        return
+    with st.container(border=True):
+        st.markdown(row["core_idea"] or "还没有核心思想。")
+        bits = []
+        if row["created_at"]:
+            bits.append(f"创建 {row['created_at']}")
+        if row["updated_at"]:
+            bits.append(f"更新 {row['updated_at']}")
+        if bits:
+            st.caption(" · ".join(bits))
 
 
 def _scope_key(strategy: str) -> str:
@@ -176,6 +326,52 @@ def _topbar(cases: list[dict], strategy: str) -> None:
     )
 
 
+_NEW_CASE_KEYS = (
+    "sl_new_name", "sl_new_when", "sl_new_code", "sl_new_strategy",
+    "sl_new_signal", "sl_new_info", "sl_new_note",
+)
+
+
+def _new_case_panel(cases: list[dict]) -> None:
+    """全部策略页的新增案例，直接展示在图库上方。"""
+    if st.session_state.pop("sl_new_reset", False):
+        for key in _NEW_CASE_KEYS:
+            st.session_state.pop(key, None)
+    try:
+        strategies = d.list_strategy_names()
+    except ValueError as e:
+        st.warning(str(e))
+        return
+    if not strategies:
+        st.warning("策略表是空的，还不能新增案例。")
+        return
+    signals = d.signal_options(cases) or ["BUY", "SELL"]
+    st.subheader("新增案例")
+    with st.container(border=True):
+        with st.form("sl_new_case", clear_on_submit=False):
+            left, right = st.columns(2)
+            name = left.text_input("案例名称", key="sl_new_name")
+            when = right.datetime_input(
+                "时间", key="sl_new_when", step=timedelta(minutes=1),
+            )
+            code = left.text_input(
+                "标的代码", key="sl_new_code", placeholder="as:688549:1h",
+            )
+            signal = right.selectbox("信号", signals, key="sl_new_signal")
+            strategy = st.selectbox("策略", strategies, key="sl_new_strategy")
+            info = st.text_area("信息", key="sl_new_info", height=80)
+            note = st.text_area("注意点", key="sl_new_note", height=80)
+            submitted = st.form_submit_button("新增", type="primary")
+        if submitted:
+            try:
+                d.insert_case(name, code, strategy, signal, when, info, note)
+            except ValueError as e:
+                st.error(str(e))
+            else:
+                st.session_state["sl_new_reset"] = True
+                st.rerun()
+
+
 def _render(strategy: str) -> None:
     title = "SIGNAL LAB" if strategy == d.ALL_STRATEGY else f"SIGNAL LAB · {strategy}"
     st.set_page_config(layout="wide", page_title=title, page_icon="🔬")
@@ -187,7 +383,7 @@ def _render(strategy: str) -> None:
             "请运行 scripts/migrate_signal_lab_to_pg.py 重新导入数据。"
         )
         return
-    if not cases:
+    if not cases and strategy != d.ALL_STRATEGY:
         st.error("案例数据为空。")
         return
 
@@ -195,18 +391,23 @@ def _render(strategy: str) -> None:
         cases if strategy == d.ALL_STRATEGY
         else [c for c in cases if c["strategy"] == strategy]
     )
+    _topbar(scoped, strategy)
+    if strategy == d.ALL_STRATEGY:
+        _new_case_panel(cases)
+    else:
+        _strategy_panel(strategy)
     if strategy != d.ALL_STRATEGY and not scoped:
         st.warning(f"策略「{strategy}」没有案例。")
         return
 
-    _topbar(scoped, strategy)
-
-    # 策略由侧边栏子页固定；这里只留名称搜索和信号筛选
+    # 指定策略的页面由侧边栏固定，不再提供名称搜索；全部策略才需要。
     suffix = _scope_key(strategy)
-    keyword = st.text_input(
-        "搜索案例名称", key=f"sl_kw_{suffix}",
-        placeholder="搜索案例名称…", label_visibility="collapsed",
-    )
+    keyword = ""
+    if strategy == d.ALL_STRATEGY:
+        keyword = st.text_input(
+            "搜索案例名称", key=f"sl_kw_{suffix}",
+            placeholder="搜索案例名称…", label_visibility="collapsed",
+        )
     signal = st.pills(
         "信号", [d.ALL_SIGNAL] + d.signal_options(scoped), key=f"sl_signal_{suffix}",
     ) or d.ALL_SIGNAL
@@ -224,6 +425,8 @@ def _render(strategy: str) -> None:
         # 避免关闭弹窗后任意 rerun 又把详情弹回来
         st.session_state.pop("sl_case_id", None)
         st.session_state.pop("sl_case_ids", None)
+        st.session_state["sl_dialog_open"] = False
+        st.session_state["sl_edit"] = ""
 
     filtered = d.filter_cases(cases, strategy=strategy, keyword=keyword, signal=signal)
     render_case_gallery(filtered, key=gallery_key)
@@ -235,7 +438,9 @@ def _render(strategy: str) -> None:
     )
 
 
-def render_case_gallery(cases: list[dict], *, key: str, cycle: str = "strategy") -> None:
+def render_case_gallery(
+    cases: list[dict], *, key: str, cycle: str = "strategy", editable: bool = True,
+) -> None:
     """案例 K 线卡片墙。回测页把成交映射成同样的 case 结构后调用。
 
     ``cycle="strategy"`` 时详情里上一个/下一个只在同一策略内翻；
@@ -254,21 +459,32 @@ def render_case_gallery(cases: list[dict], *, key: str, cycle: str = "strategy")
     cards = g.build_cards_payload(page_cases, thumbs)
     result = g.render_gallery(cards, page_no, total_pages, key=key)
 
-    # 只在「当次」点击卡片（selected 触发值存在）时打开弹窗；
-    # X 关闭后触发值已消费，后续任何 rerun（翻页/改筛选）都不会再误弹
+    # 点击卡片时记下打开状态。保存后整页重跑仍要留着弹窗；
+    # 点 X 会清掉这个状态，之后的翻页和筛选不会再把弹窗带回来。
+    st.session_state["sl_case_editable"] = editable
     selected = getattr(result, "selected", None)
     if selected:
         by_id = {c["id"]: c for c in cases}
         hit = by_id.get(selected)
         if hit is not None:
             st.session_state["sl_case_id"] = selected
+            st.session_state["sl_dialog_open"] = True
             if cycle == "all":
                 st.session_state["sl_case_ids"] = [c["id"] for c in cases]
             else:
                 st.session_state["sl_case_ids"] = [
                     c["id"] for c in cases if c["strategy"] == hit["strategy"]
                 ]
-            _show_case_dialog(by_id)
+    if st.session_state.get("sl_dialog_open") and st.session_state.get("sl_case_id"):
+        by_id = {c["id"]: c for c in cases}
+        cur = st.session_state["sl_case_id"]
+        if cur not in by_id:
+            live = _live_case(cur, None)
+            if live is None:
+                st.session_state["sl_dialog_open"] = False
+                return
+            by_id[cur] = live
+        _show_case_dialog(by_id)
 
 
 def page_signal_lab() -> None:

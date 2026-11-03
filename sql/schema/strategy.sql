@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS strategy_case (
     id          text PRIMARY KEY,
     name        text NOT NULL DEFAULT '',
     signal_date date NOT NULL,
+    signal_at   timestamp,
     symbol_id   text NOT NULL,
     signal      text NOT NULL DEFAULT '',
     strategy    text NOT NULL DEFAULT '',
@@ -38,6 +39,7 @@ COMMENT ON TABLE strategy_case IS '策略案例';
 COMMENT ON COLUMN strategy_case.id IS '飞书记录 id';
 COMMENT ON COLUMN strategy_case.name IS '案例名称';
 COMMENT ON COLUMN strategy_case.signal_date IS '信号日期';
+COMMENT ON COLUMN strategy_case.signal_at IS '案例时间，含时分。空表示还没改过，详情用 K 线时间';
 COMMENT ON COLUMN strategy_case.symbol_id IS '标的代码，如 as:688802:2h';
 COMMENT ON COLUMN strategy_case.signal IS '信号类型，如 BUY';
 COMMENT ON COLUMN strategy_case.strategy IS '策略名，对应 strategy.name';

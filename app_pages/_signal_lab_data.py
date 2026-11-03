@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import math
 import os
+import secrets
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -18,7 +20,7 @@ REQUIRED_KEYS = ("id", "name", "date", "code", "signal", "strategy")
 _CASE_KEYS = ("id", "name", "date", "code", "signal", "strategy", "info", "note")
 
 _SELECT_SQL = (
-    "SELECT id, name, signal_date, symbol_id, signal, strategy, info, note "
+    "SELECT id, name, signal_date, symbol_id, signal, strategy, info, note, signal_at "
     "FROM strategy_case ORDER BY signal_date DESC, id DESC"
 )
 
@@ -36,15 +38,24 @@ def _conn_str() -> str | None:
 
 def _rows_to_cases(rows: list[tuple]) -> list[dict]:
     """DB 行 -> 页面 case dict（date 统一 ISO 字符串）；纯函数。"""
-    return [
-        {
+    out = []
+    for r in rows:
+        at = _fmt_ts(r[8]) if len(r) > 8 else ""
+        out.append({
             "id": str(r[0]), "name": str(r[1] or ""), "date": r[2].isoformat(),
             "code": str(r[3] or ""), "signal": str(r[4] or ""),
             "strategy": str(r[5] or ""), "info": str(r[6] or ""),
-            "note": str(r[7] or ""),
-        }
-        for r in rows
-    ]
+            "note": str(r[7] or ""), "at": at,
+        })
+    return out
+
+
+def checked_strategy_name(name: str, exists: bool) -> str:
+    """策略名必须能在 strategy 表里对上。不存在时抛 ValueError。"""
+    cleaned = str(name or "").strip()
+    if not exists:
+        raise ValueError(f"策略「{cleaned}」不存在")
+    return cleaned
 
 
 def load_cases(path: Path = DATA_PATH) -> list[dict]:
@@ -65,7 +76,7 @@ def load_cases(path: Path = DATA_PATH) -> list[dict]:
 
 @st.cache_data(ttl=600, max_entries=4, show_spinner=False)
 def get_cases() -> list[dict]:
-    """页面入口：读 PG strategy_case 表（短缓存；迁移后最多 10 分钟生效）。
+    """页面入口：读 PG strategy_case 表（短缓存；写入后会清掉）。
 
     连接/查询失败统一转 ValueError，页面层据此显示错误提示。
     """
@@ -84,6 +95,186 @@ def get_cases() -> list[dict]:
     except psycopg.Error as e:
         raise ValueError(f"PG 查询 strategy_case 失败：{e}") from e
     return _rows_to_cases(rows)
+
+
+def _fmt_ts(value) -> str:
+    """时间戳显示为上海时间。空值返回空串。"""
+    if value is None:
+        return ""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    if not isinstance(value, datetime):
+        return str(value)
+    if value.tzinfo is not None:
+        value = value.astimezone(ZoneInfo("Asia/Shanghai"))
+    return value.strftime("%Y-%m-%d %H:%M")
+
+
+@st.cache_data(ttl=600, max_entries=8, show_spinner=False)
+def get_strategy(name: str) -> dict | None:
+    """读 strategy 表的一行。没有该策略时返回 None。"""
+    url = _conn_str()
+    if not url:
+        raise ValueError(
+            "未配置 PG 连接：请设置 DATABASE_URL 或 .streamlit/secrets.toml "
+            "的 connections.quantdb.url"
+        )
+    import psycopg
+
+    try:
+        with psycopg.connect(url, autocommit=True) as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT name, core_idea, created_at, updated_at "
+                "FROM strategy WHERE name = %s",
+                (name,),
+            )
+            row = cur.fetchone()
+    except psycopg.Error as e:
+        raise ValueError(f"PG 查询 strategy 失败：{e}") from e
+    if row is None:
+        return None
+    return {
+        "name": str(row[0] or ""),
+        "core_idea": str(row[1] or ""),
+        "created_at": _fmt_ts(row[2]),
+        "updated_at": _fmt_ts(row[3]),
+    }
+
+
+def _connect():
+    """打开 quant 库连接。没配置或连不上时抛 ValueError。"""
+    url = _conn_str()
+    if not url:
+        raise ValueError(
+            "未配置 PG 连接：请设置 DATABASE_URL 或 .streamlit/secrets.toml "
+            "的 connections.quantdb.url"
+        )
+    import psycopg
+
+    try:
+        return psycopg.connect(url, autocommit=True)
+    except psycopg.Error as e:
+        raise ValueError(f"PG 连接失败：{e}") from e
+
+
+def strategy_exists(name: str) -> bool:
+    """strategy 表里是否有这个名字。不走缓存，避免刚写入的策略被判不存在。"""
+    import psycopg
+
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM strategy WHERE name = %s", (name,))
+            return cur.fetchone() is not None
+    except psycopg.Error as e:
+        raise ValueError(f"PG 查询 strategy 失败：{e}") from e
+
+
+def update_case_when(case_id: str, when: datetime) -> None:
+    """写入案例时间，并同步 signal_date 的日期部分。"""
+    if when is None:
+        raise ValueError("请选择时间")
+    stamp = when.replace(tzinfo=None, second=0, microsecond=0)
+    import psycopg
+
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE strategy_case "
+                "SET signal_at = %s, signal_date = %s, updated_at = now() "
+                "WHERE id = %s",
+                (stamp, stamp.date(), case_id),
+            )
+            changed = cur.rowcount
+    except psycopg.Error as e:
+        raise ValueError(f"更新案例时间失败：{e}") from e
+    if changed != 1:
+        raise ValueError("案例不存在，可能数据已更新。")
+    get_cases.clear()
+
+
+def prepare_new_case(
+    name: str,
+    code: str,
+    strategy: str,
+    signal: str,
+    when: datetime | None,
+    info: str = "",
+    note: str = "",
+    *,
+    strategy_known: bool,
+) -> dict:
+    """校验新增案例。策略不存在、代码或名称不合法时抛 ValueError，不写库。"""
+    cleaned_name = str(name or "").strip()
+    if not cleaned_name:
+        raise ValueError("请填写案例名称")
+    parsed = parse_code(code)
+    if parsed is None:
+        raise ValueError("标的代码需要写成 交易所:代码:周期，例如 as:688549:1h")
+    cleaned_signal = str(signal or "").strip()
+    if not cleaned_signal:
+        raise ValueError("请选择信号")
+    if when is None:
+        raise ValueError("请选择时间")
+    stamp = when.replace(tzinfo=None, second=0, microsecond=0)
+    return {
+        "name": cleaned_name,
+        "code": ":".join(parsed),
+        "strategy": checked_strategy_name(strategy, strategy_known),
+        "signal": cleaned_signal,
+        "when": stamp,
+        "info": str(info or "").strip(),
+        "note": str(note or "").strip(),
+    }
+
+
+def insert_case(
+    name: str,
+    code: str,
+    strategy: str,
+    signal: str,
+    when: datetime | None,
+    info: str = "",
+    note: str = "",
+) -> str:
+    """写入一条案例，返回新 id。id 以 sv 开头，和飞书记录 id 分开。"""
+    fields = prepare_new_case(
+        name, code, strategy, signal, when, info, note,
+        strategy_known=strategy_exists(str(strategy or "").strip()),
+    )
+    case_id = "sv" + secrets.token_hex(8)
+    import psycopg
+
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO strategy_case "
+                "(id, name, signal_date, signal_at, symbol_id, signal, strategy, info, note) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    case_id, fields["name"], fields["when"].date(), fields["when"],
+                    fields["code"], fields["signal"], fields["strategy"],
+                    fields["info"], fields["note"],
+                ),
+            )
+    except psycopg.Error as e:
+        raise ValueError(f"新增案例失败：{e}") from e
+    get_cases.clear()
+    return case_id
+
+
+@st.cache_data(ttl=600, max_entries=2, show_spinner=False)
+def list_strategy_names() -> list[str]:
+    """strategy 表里的策略名，供新增案例选择。"""
+    import psycopg
+
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT name FROM strategy ORDER BY name")
+            rows = cur.fetchall()
+    except psycopg.Error as e:
+        raise ValueError(f"PG 查询 strategy 失败：{e}") from e
+    return [str(row[0]) for row in rows if row[0]]
 
 
 def parse_code(code: str) -> tuple[str, str, str] | None:

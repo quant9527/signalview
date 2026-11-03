@@ -109,8 +109,8 @@ export default function (component) {
         <div class="card" data-id="${esc(c.id)}">
           <div class="thumb">${c.thumb || ""}
             <div class="badges">
-              <span class="badge badge-${esc(c.signalClass)}">${esc(c.signal)}</span>
               ${c.strategy ? `<span class="badge badge-strat" title="${esc(c.strategy)}">${esc(c.strategy)}</span>` : ""}
+              <span class="badge badge-${esc(c.signalClass)}">${esc(c.signal)}</span>
             </div>
             <div class="hover"><span>查看详情</span></div>
           </div>

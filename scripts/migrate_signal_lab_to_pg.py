@@ -1,4 +1,4 @@
-"""把 data/signal_lab_cases.json 迁移到 PG（quant 库 signal_lab_case 表）。
+"""把 data/signal_lab_cases.json 迁移到 PG（quant 库 strategy_case 表）。
 
 用法：
     uv run python scripts/migrate_signal_lab_to_pg.py [json路径]
@@ -18,7 +18,7 @@ REPO = Path(__file__).resolve().parent.parent
 DEFAULT_JSON = REPO / "data" / "signal_lab_cases.json"
 
 DDL = """
-CREATE TABLE IF NOT EXISTS signal_lab_case (
+CREATE TABLE IF NOT EXISTS strategy_case (
     id          text PRIMARY KEY,
     name        text NOT NULL DEFAULT '',
     signal_date date NOT NULL,
@@ -30,12 +30,12 @@ CREATE TABLE IF NOT EXISTS signal_lab_case (
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_signal_lab_case_date
-    ON signal_lab_case (signal_date DESC);
+CREATE INDEX IF NOT EXISTS idx_strategy_case_date
+    ON strategy_case (signal_date DESC);
 """
 
 UPSERT = """
-INSERT INTO signal_lab_case
+INSERT INTO strategy_case
     (id, name, signal_date, symbol_id, signal, strategy, info, note)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (id) DO UPDATE SET
@@ -93,7 +93,7 @@ def main(argv: list[str]) -> int:
     with psycopg.connect(url, autocommit=True) as conn, conn.cursor() as cur:
         cur.execute(DDL)
         cur.executemany(UPSERT, rows)
-        cur.execute("SELECT count(*) FROM signal_lab_case")
+        cur.execute("SELECT count(*) FROM strategy_case")
         total = cur.fetchone()[0]
     print(f"迁移完成：upsert {len(rows)} 条，表内共 {total} 条（{json_path}）")
     return 0

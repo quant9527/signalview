@@ -19,7 +19,7 @@ _CASE_KEYS = ("id", "name", "date", "code", "signal", "strategy", "info", "note"
 
 _SELECT_SQL = (
     "SELECT id, name, signal_date, symbol_id, signal, strategy, info, note "
-    "FROM signal_lab_case ORDER BY signal_date DESC, id DESC"
+    "FROM strategy_case ORDER BY signal_date DESC, id DESC"
 )
 
 
@@ -63,9 +63,9 @@ def load_cases(path: Path = DATA_PATH) -> list[dict]:
     return out
 
 
-@st.cache_data(ttl=600, max_entries=4)
+@st.cache_data(ttl=600, max_entries=4, show_spinner=False)
 def get_cases() -> list[dict]:
-    """页面入口：读 PG signal_lab_case 表（短缓存；迁移后最多 10 分钟生效）。
+    """页面入口：读 PG strategy_case 表（短缓存；迁移后最多 10 分钟生效）。
 
     连接/查询失败统一转 ValueError，页面层据此显示错误提示。
     """
@@ -82,7 +82,7 @@ def get_cases() -> list[dict]:
             cur.execute(_SELECT_SQL)
             rows = cur.fetchall()
     except psycopg.Error as e:
-        raise ValueError(f"PG 查询 signal_lab_case 失败：{e}") from e
+        raise ValueError(f"PG 查询 strategy_case 失败：{e}") from e
     return _rows_to_cases(rows)
 
 

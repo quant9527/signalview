@@ -130,21 +130,3 @@ def page_walkfwd_compare() -> None:
     col1.metric("A ∩ B (共同)", len(common))
     col2.metric("A - B (仅 baseline)", len(only_a))
     col3.metric("B - A (仅 ml_pick)", len(only_b))
-
-    # 顶部 + 底部 trade 对照
-    st.subheader("🏆 最佳 / 最差 top-10 交易")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.caption("Run A")
-        top_a, bot_a = br._get_top_bot_trades(run_id_a, n=10)
-        if not top_a.empty:
-            st.write("Top 10:")
-            st.dataframe(top_a[["Column", "Entry Timestamp", "Exit Timestamp",
-                                "Return"]].head(10), hide_index=True)
-    with col2:
-        st.caption("Run B")
-        top_b, bot_b = br._get_top_bot_trades(run_id_b, n=10)
-        if not top_b.empty:
-            st.write("Top 10:")
-            st.dataframe(top_b[["Column", "Entry Timestamp", "Exit Timestamp",
-                                "Return"]].head(10), hide_index=True)

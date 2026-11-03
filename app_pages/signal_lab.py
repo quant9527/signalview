@@ -1,29 +1,33 @@
 """SIGNAL LAB — 策略案例图库。
 
-数据来自 data/signal_lab_cases.json（飞书策略库抓取），
+策略在侧边栏「案例库」下各占一个子页，进入页面即固定该策略。
+「全部策略」对应 /signal_lab。
+数据来自 PostgreSQL strategy_case；策略说明在 strategy 表。
 卡片缩略图与详情大图按案例 symbol_id 实时渲染 K 线。
 hyperliquid 等未支持交易所的案例（如 hyperliquid:BTCUSDT:1h）显示占位图，属已知限制。
 两段式 code（如 as:603893，缺 freq 段）parse_code 返回 None，详情图降级为「暂不可用」提示。
 """
 from __future__ import annotations
 
+import html
+from collections.abc import Callable
+
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components_v1  # 与 kline_fullscreen 一致：内联 echarts HTML 用 components.html 渲染
 
 from app_pages import _signal_lab_data as d
-from app_pages import _signal_lab_filters as f
 from app_pages import _signal_lab_gallery as g
 from app_pages import _signal_lab_thumbs as t
 from app_pages import kline_charts as kc
 from flight_kline_client import build_kline_tags, fetch_kline_dataframe
 
 PER_PAGE = 28
-_GALLERY_KEY = "sl_gallery"
-_STRATEGY_SEL_KEY = "sl_strategy_sel"
+_NAV_WARNED = False
 
 
-_CHART_HEIGHT = 520
+# 详情图含 K 线、成交量、MACD 和底部缩放条，iframe 与图表同高
+_CHART_HEIGHT = 680
 # 详情大图视口：与缩略图完全一致，右侧另有 EXTRA_AFTER 根备用 bar
 # （加载但不出现在初始视图，详情页拖 dataZoom 可向右查看）
 _DETAIL_BEFORE = t.WINDOW_BEFORE
@@ -89,7 +93,7 @@ def _case_chart_html_cached(code: str, date: str) -> str | None:
             zoom["endValue"] = visible_n - 1
         charts = [{"id": "ch_case", "height": _CHART_HEIGHT, "option": option}]
         metas = {"ch_case": kc.build_chart_meta(labels, ohlc, ma_lines, [])}
-        return kc.build_echarts_html(charts, metas)
+        return kc.build_echarts_html(charts, metas, embedded=True)
     except Exception as e:
         print(f"[SignalLab] chart failed for {code}: {e}")
         return None
@@ -116,7 +120,8 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
     with left:
         html = _case_chart_html(case)
         if html:
-            components_v1.html(html, height=_CHART_HEIGHT)
+            # 边框各 1px，框高略大于图表，避免缩放条被切掉
+            components_v1.html(html, height=_CHART_HEIGHT + 2, scrolling=False)
         else:
             st.info("K 线数据暂不可用（标的代码无法解析或数据源无此合约）。")
     with right:
@@ -145,15 +150,23 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
         st.rerun(scope="fragment")
 
 
-def _topbar(cases: list[dict]) -> None:
+def _scope_key(strategy: str) -> str:
+    """session state 后缀：每个策略子页各自记住搜索、信号和页码。"""
+    return "all" if strategy == d.ALL_STRATEGY else strategy
+
+
+def _topbar(cases: list[dict], strategy: str) -> None:
     n_cases = len(cases)
     n_signals = len(d.signal_options(cases))
+    subtitle = html.escape(
+        "策略案例图库" if strategy == d.ALL_STRATEGY else strategy
+    )
     # K 线窗口根数与缩略图/详情大图共用同一常量，改 t.WINDOW_* 此处自动同步
     st.markdown(
         f"""
         <div style="padding:.25rem 0 .5rem 0;display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap">
           <span style="font-size:1.6rem;font-weight:700;letter-spacing:.35em">SIGNAL LAB</span>
-          <span style="font-size:.85rem;opacity:.65">策略案例图库</span>
+          <span style="font-size:.85rem;opacity:.65">{subtitle}</span>
           <span style="font-size:.8rem;opacity:.5;margin-left:auto">
             {n_cases} 个案例 · {n_signals} 类信号 · K线窗口 {t.WINDOW_BEFORE}+{t.WINDOW_AFTER} 根
           </span>
@@ -163,8 +176,9 @@ def _topbar(cases: list[dict]) -> None:
     )
 
 
-def page_signal_lab() -> None:
-    st.set_page_config(layout="wide", page_title="SIGNAL LAB", page_icon="🔬")
+def _render(strategy: str) -> None:
+    title = "SIGNAL LAB" if strategy == d.ALL_STRATEGY else f"SIGNAL LAB · {strategy}"
+    st.set_page_config(layout="wide", page_title=title, page_icon="🔬")
     try:
         cases = d.get_cases()
     except (FileNotFoundError, ValueError) as e:
@@ -177,62 +191,122 @@ def page_signal_lab() -> None:
         st.error("案例数据为空。")
         return
 
-    _topbar(cases)
-
-    # 策略用分组 CCv2 pills（同前缀一行，组间换行）；信号仍是原生 st.pills
-    strategy_pick = f.render_strategy_groups(
-        d.strategy_options(cases),
-        str(st.session_state.get(_STRATEGY_SEL_KEY) or ""),
+    scoped = (
+        cases if strategy == d.ALL_STRATEGY
+        else [c for c in cases if c["strategy"] == strategy]
     )
-    picked = getattr(strategy_pick, "select", None)
-    if picked is not None:
-        st.session_state[_STRATEGY_SEL_KEY] = picked
-        # 组件本次已用旧 value 渲染完（高亮滞后一拍），立即重跑让它显示新选中态；
-        # 触发值只消费一次，不会循环
-        st.rerun()
-    strategy = st.session_state.get(_STRATEGY_SEL_KEY) or d.ALL_STRATEGY
-    keyword = st.text_input("搜索案例名称", key="sl_kw",
-                            placeholder="搜索案例名称…", label_visibility="collapsed")
-    signal = st.pills("信号", [d.ALL_SIGNAL] + d.signal_options(cases), key="sl_signal") or d.ALL_SIGNAL
+    if strategy != d.ALL_STRATEGY and not scoped:
+        st.warning(f"策略「{strategy}」没有案例。")
+        return
 
+    _topbar(scoped, strategy)
+
+    # 策略由侧边栏子页固定；这里只留名称搜索和信号筛选
+    suffix = _scope_key(strategy)
+    keyword = st.text_input(
+        "搜索案例名称", key=f"sl_kw_{suffix}",
+        placeholder="搜索案例名称…", label_visibility="collapsed",
+    )
+    signal = st.pills(
+        "信号", [d.ALL_SIGNAL] + d.signal_options(scoped), key=f"sl_signal_{suffix}",
+    ) or d.ALL_SIGNAL
+
+    gallery_key = f"sl_gallery_{suffix}"
     # 筛选条件变化时重置卡片墙的页码，避免停留在超出范围的旧页
+    sig_key = f"sl_filter_sig_{suffix}"
     _filter_sig = f"{strategy}|{keyword.strip()}|{signal}"
-    if st.session_state.get("sl_filter_sig") != _filter_sig:
-        st.session_state["sl_filter_sig"] = _filter_sig
+    if st.session_state.get(sig_key) != _filter_sig:
+        st.session_state[sig_key] = _filter_sig
         # 整个 state key 弹掉：CCv2 组件状态的实际结构不保证是
         # {"page": int}，部分 pop 可能无效；清空全部状态即可回到第 1 页
-        st.session_state.pop(_GALLERY_KEY, None)
+        st.session_state.pop(gallery_key, None)
         # 筛选变化意味着用户离开了当前浏览上下文，同步清理弹窗状态，
         # 避免关闭弹窗后任意 rerun 又把详情弹回来
         st.session_state.pop("sl_case_id", None)
         st.session_state.pop("sl_case_ids", None)
 
     filtered = d.filter_cases(cases, strategy=strategy, keyword=keyword, signal=signal)
+    render_case_gallery(filtered, key=gallery_key)
+
+    st.markdown(
+        f"<div style='text-align:center;opacity:.5;font-size:.8rem;padding:1.5rem 0'>"
+        f"SIGNAL LAB © 2026 策略案例图库 · 共 {len(scoped)} 个案例</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_case_gallery(cases: list[dict], *, key: str, cycle: str = "strategy") -> None:
+    """案例 K 线卡片墙。回测页把成交映射成同样的 case 结构后调用。
+
+    ``cycle="strategy"`` 时详情里上一个/下一个只在同一策略内翻；
+    ``cycle="all"`` 时在传入的整份列表里翻。
+    """
+    if not cases:
+        st.info("没有可展示的记录。")
+        return
     cur_page = 1
-    state = st.session_state.get(_GALLERY_KEY)
+    state = st.session_state.get(key)
     if isinstance(state, dict) and isinstance(state.get("page"), int):
         cur_page = state["page"]
-    page_cases, page_no, total_pages = d.paginate(filtered, cur_page, PER_PAGE)
+    page_cases, page_no, total_pages = d.paginate(cases, cur_page, PER_PAGE)
 
     thumbs = t.thumbs_for_page(tuple((c["code"], c["date"]) for c in page_cases))
     cards = g.build_cards_payload(page_cases, thumbs)
-    result = g.render_gallery(cards, page_no, total_pages, key=_GALLERY_KEY)
+    result = g.render_gallery(cards, page_no, total_pages, key=key)
 
     # 只在「当次」点击卡片（selected 触发值存在）时打开弹窗；
     # X 关闭后触发值已消费，后续任何 rerun（翻页/改筛选）都不会再误弹
     selected = getattr(result, "selected", None)
     if selected:
-        by_id = {c["id"]: c for c in filtered}
+        by_id = {c["id"]: c for c in cases}
         hit = by_id.get(selected)
         if hit is not None:
             st.session_state["sl_case_id"] = selected
-            st.session_state["sl_case_ids"] = [
-                c["id"] for c in filtered if c["strategy"] == hit["strategy"]
-            ]
-            _show_case_dialog({c["id"]: c for c in cases})
+            if cycle == "all":
+                st.session_state["sl_case_ids"] = [c["id"] for c in cases]
+            else:
+                st.session_state["sl_case_ids"] = [
+                    c["id"] for c in cases if c["strategy"] == hit["strategy"]
+                ]
+            _show_case_dialog(by_id)
 
-    st.markdown(
-        f"<div style='text-align:center;opacity:.5;font-size:.8rem;padding:1.5rem 0'>"
-        f"SIGNAL LAB © 2026 策略案例图库 · 共 {len(cases)} 个案例</div>",
-        unsafe_allow_html=True,
-    )
+
+def page_signal_lab() -> None:
+    """全部策略：/signal_lab。"""
+    _render(d.ALL_STRATEGY)
+
+
+def page_for_strategy(strategy: str) -> Callable[[], None]:
+    """返回只展示指定策略的页面函数。st.Page 的 callable 不能带参数。"""
+    def _page() -> None:
+        _render(strategy)
+
+    _page.__name__ = f"page_signal_lab_{strategy}"
+    return _page
+
+
+def signal_lab_pages() -> list[st.StreamlitPage]:
+    """案例库分区：全部策略 + 每个策略一个子页。
+
+    案例库暂时读不到时只保留「全部策略」，页面内再提示错误，
+    避免导航注册失败把整个应用拖垮。
+    """
+    global _NAV_WARNED
+    pages: list[st.StreamlitPage] = [
+        st.Page(page_signal_lab, title="全部策略", icon="🔬", url_path="signal_lab"),
+    ]
+    try:
+        names = d.strategy_options(d.get_cases())
+    except Exception as e:
+        if not _NAV_WARNED:
+            print(f"[SignalLab] 策略子页未注册：{e}")
+            _NAV_WARNED = True
+        return pages
+    seen = {"signal_lab"}
+    for name in names:
+        url_path = f"signal_lab_{name}"
+        if "/" in url_path or url_path in seen:
+            continue
+        seen.add(url_path)
+        pages.append(st.Page(page_for_strategy(name), title=name, url_path=url_path))
+    return pages

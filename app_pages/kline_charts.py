@@ -854,8 +854,14 @@ border:1px solid var(--border);border-radius:8px;}
 """
 
 
-def build_echarts_html(chart_configs: list[dict], metas: dict[str, dict]) -> str:
-    """渲染多个 ECharts 实例的 HTML（Kline.html 外壳），charts 之间 connect 联动。"""
+def build_echarts_html(
+    chart_configs: list[dict], metas: dict[str, dict], *, embedded: bool = False
+) -> str:
+    """渲染多个 ECharts 实例的 HTML（Kline.html 外壳），charts 之间 connect 联动。
+
+    ``embedded=True`` 时不画整页标题栏，外层不再留白，高度等于图表本身。
+    给弹窗 iframe 用，避免标题把 MACD 和缩放条挤出可视区域。
+    """
     divs: list[str] = []
     inits: list[str] = []
     opts: list[str] = []
@@ -888,11 +894,12 @@ def build_echarts_html(chart_configs: list[dict], metas: dict[str, dict]) -> str
     meta_json = json.dumps(metas, ensure_ascii=False)
     meta_json = meta_json.replace("</", "<\\/")
 
-    html = f"""<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-<style>{_PAGE_CSS}</style>
-</head><body>
+    header = ""
+    extra_css = ""
+    if embedded:
+        extra_css = "body{background:transparent}.charts{padding:0}.chart{margin:0}"
+    else:
+        header = """
 <header>
   <h1>K线多标的联动 · 买卖信号叠加</h1>
   <div class="legend">
@@ -900,7 +907,13 @@ def build_echarts_html(chart_configs: list[dict], metas: dict[str, dict]) -> str
     <span><span class="dot" style="background:var(--down)"></span>卖出 SELL</span>
     <span class="hint">滚轮/拖拽缩放 · 十字光标与缩放多图同步 · 鼠标移到 K 线查看信号详情</span>
   </div>
-</header>
+</header>"""
+    html = f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>{_PAGE_CSS}{extra_css}</style>
+</head><body>
+{header}
 <div id="charts" class="charts">{"".join(divs)}</div>
 <script>
 {_TIP_JS}

@@ -16,6 +16,7 @@ import streamlit as st
 from psycopg import sql
 from psycopg.rows import dict_row
 
+from app_pages import _signal_lab_data as case_data
 from app_pages.signal_lab import render_case_gallery
 
 MLFLOW_DATABASE = "mlflow"
@@ -72,6 +73,7 @@ def trades_to_cases(frame: pd.DataFrame) -> list[dict]:
             "id": case_id,
             "name": name,
             "date": entry[:10],
+            "at": entry[:16],
             "code": kline_code(symbol_id),
             "signal": signal,
             "strategy": str(row.get("signal_name") or ""),
@@ -79,6 +81,33 @@ def trades_to_cases(frame: pd.DataFrame) -> list[dict]:
             "note": direction,
         })
     return cases
+
+
+def signal_names_from_frames(frames: list[pd.DataFrame]) -> list[str]:
+    """从成交表收集策略名，按首次出现的顺序，空名丢掉。"""
+    seen: set[str] = set()
+    names: list[str] = []
+    for frame in frames:
+        if frame is None or frame.empty or "signal_name" not in frame.columns:
+            continue
+        for raw in frame["signal_name"].tolist():
+            name = str(raw or "").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            names.append(name)
+    return names
+
+
+def related_strategy_names(signal_names: list[str], page_names: list[str]) -> list[str]:
+    """成交策略名里，已经有策略页的那些。按名字排序。
+
+    一次回测的 run 名和 pick_id 是任务，不是策略。同一页可以包含多个策略，
+    只保留 signal_name 与策略页名字完全一致的那些。
+    """
+    known = {str(name).strip() for name in page_names if str(name).strip()}
+    found = {str(name).strip() for name in signal_names if str(name).strip() in known}
+    return sorted(found)
 
 
 def replace_database(url: str, database: str) -> str:
@@ -106,6 +135,18 @@ def _connect() -> psycopg.Connection:
     if not url:
         raise RuntimeError("未配置数据库连接，读不到 MLflow。")
     return psycopg.connect(url, row_factory=dict_row, connect_timeout=10)
+
+
+def _strategy_page_names() -> list[str]:
+    """当前会注册策略页的名字。读不到时当没有。"""
+    try:
+        cases = case_data.get_cases()
+        table_names = case_data.list_strategy_names()
+    except ValueError:
+        return []
+    return case_data.strategy_page_names(
+        case_data.strategy_options(cases), table_names,
+    )
 
 
 def _labels_for(names: set[str]) -> list[tuple[str, str]]:
@@ -293,20 +334,62 @@ def _render_run(run_id: str) -> None:
         return
     _header(run_id, run["name"], params, metrics)
 
+    loaded: dict[str, pd.DataFrame | None] = {}
+    frames: list[pd.DataFrame] = []
+    for filename, _label in run["artifacts"]:
+        try:
+            frame = load_trades(run["id"], filename)
+        except (OSError, ValueError):
+            frame = None
+        loaded[filename] = frame
+        if frame is not None:
+            frames.append(frame)
+    related = related_strategy_names(
+        signal_names_from_frames(frames), _strategy_page_names(),
+    )
+
     labels = [label for _, label in run["artifacts"]]
-    choice = st.pills("成交", labels, default=labels[0], key=f"bt_art_{run_id}") or labels[0]
+    choice = st.pills(
+        "成交",
+        labels + related,
+        default=labels[0],
+        key=f"bt_art_{run_id}",
+        width="content",
+    ) or labels[0]
+    if choice in related:
+        _render_strategy_cases(run_id, choice)
+        return
     by_label = {label: name for name, label in run["artifacts"]}
     filename = by_label[choice]
-    try:
-        frame = load_trades(run["id"], filename)
-    except (OSError, ValueError) as e:
-        st.error(f"读不到 {filename}：{e}")
+    frame = loaded.get(filename)
+    if frame is None:
+        st.error(f"读不到 {filename}。")
         return
     render_case_gallery(
         trades_to_cases(frame),
         key=f"bt_gallery_{run_id}_{filename}",
         cycle="all",
         editable=False,
+        save_case=True,
+    )
+
+
+def _render_strategy_cases(run_id: str, strategy: str) -> None:
+    """同一块区域换成这个策略在案例库里的缩略图，不离开回测页。"""
+    try:
+        cases = case_data.filter_cases(case_data.get_cases(), strategy=strategy)
+    except ValueError as e:
+        st.error(str(e))
+        return
+    if not cases:
+        st.info(f"策略「{strategy}」没有案例。")
+        return
+    render_case_gallery(
+        cases,
+        key=f"bt_cases_{run_id}_{strategy}",
+        cycle="all",
+        editable=False,
+        save_case=False,
     )
 
 

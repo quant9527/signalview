@@ -30,8 +30,6 @@ FREQ_FORWARD_DAYS = {
     "1d": 120, "1w": 500, "1M": 2200,
 }
 _DEFAULT_FORWARD_DAYS = 60
-# 案例日标记容差（单位：天；换算成秒与 _x 比较）
-MARK_TOLERANCE_DAYS = 1.5
 # 派生频率：服务端不直接入库，取 1d 数据由服务端聚合
 DERIVED_FREQS = {"1w": "1d", "1M": "1d"}
 
@@ -63,6 +61,26 @@ def slice_window(
     start = max(0, pos - before)
     end = min(len(bars), pos + after + 1)
     return bars.iloc[start:end]
+
+
+def anchor_timestamp(window: pd.DataFrame | None, date: str, at: str = "") -> pd.Timestamp | None:
+    """详情图和缩略图共用的信号 K 线。
+
+    有保存时刻时取离它最近的一根；只有日期时优先当天，避免午夜就近落到前一根日终 bar。
+    """
+    if window is None or window.empty or "_x" not in window.columns:
+        return None
+    stored = pd.Timestamp(at) if at else None
+    if stored is not None:
+        target = stored
+        pool = window
+    else:
+        target = pd.Timestamp(date)
+        same_day = window["_x"].dt.normalize() == target.normalize()
+        pool = window.loc[same_day] if bool(same_day.any()) else window
+    if pool.empty:
+        return None
+    return pd.Timestamp(pool.loc[(pool["_x"] - target).abs().idxmin(), "_x"])
 
 
 def fetch_case_bars(code_dates: dict[str, str]) -> dict[str, pd.DataFrame]:
@@ -137,8 +155,12 @@ def render_candle_svg(
     case_date: str,
     width: int = _WIDTH,
     height: int = _HEIGHT,
+    at: str = "",
 ) -> str | None:
-    """把窗口 K 线渲染成 SVG（K线+MA5/MA10、成交量柱、MACD、案例日虚线标记）。"""
+    """把窗口 K 线渲染成 SVG（K线+MA5/MA10、成交量柱、MACD、信号虚线标记）。
+
+    at 是已保存的案例时间。标记落点和详情图相同。
+    """
     if bars is None or len(bars) == 0:
         return None
     n = len(bars)
@@ -184,7 +206,7 @@ def render_candle_svg(
     def y_m(v: float) -> float:
         return macd_top + macd_h / 2 - v / mmax * (macd_h / 2)
 
-    target = pd.Timestamp(case_date)
+    anchor = anchor_timestamp(bars, case_date, at)
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
         'preserveAspectRatio="none">'
@@ -197,6 +219,9 @@ def render_candle_svg(
         )
     mark_x: float | None = None
     for i, (_, b) in enumerate(bars.iterrows()):
+        cx = pad_l + step * (i + 0.5)
+        if mark_x is None and anchor is not None and pd.Timestamp(b["_x"]) == anchor:
+            mark_x = cx
         o, c = _finite(b["open"]), _finite(b["close"])
         h, l = _finite(b["high"]), _finite(b["low"])
         if o is None or c is None or h is None or l is None:
@@ -204,7 +229,6 @@ def render_candle_svg(
         vol = _finite(b.get("volume")) if has_vol else 0.0
         if has_vol and vol is None:
             vol = 0.0
-        cx = pad_l + step * (i + 0.5)
         color = _UP if c >= o else _DOWN
         y_wick_top, y_wick_bot = y_k(h), y_k(l)
         y_top = y_k(max(o, c))
@@ -234,8 +258,6 @@ def render_candle_svg(
                     f'width="{body_w:.1f}" height="{max(0.5, abs(y0 - yv)):.1f}" '
                     f'fill="{_UP if hv >= 0 else _DOWN}" opacity="0.55"/>'
                 )
-        if mark_x is None and abs((b["_x"] - target).total_seconds()) < 86400 * MARK_TOLERANCE_DAYS:
-            mark_x = cx
 
     # MA 与 MACD 线（逐点 NaN 容错，分段绘制）
     def line_points(s: pd.Series | None, y_fn) -> list[tuple[float, float] | None]:
@@ -270,13 +292,17 @@ def placeholder_svg(width: int = _WIDTH, height: int = _HEIGHT) -> str:
 
 
 @st.cache_data(ttl=3600, max_entries=64, show_spinner=False)
-def thumbs_for_page(code_dates: tuple[tuple[str, str], ...]) -> dict[str, str]:
-    """为一页案例生成缩略图；key 为 `code|date`，value 为 SVG 字符串。"""
-    code_date_map = {code: d for code, d in code_dates}
+def thumbs_for_page(code_dates: tuple[tuple[str, str, str], ...]) -> dict[str, str]:
+    """为一页案例生成缩略图；key 为 `code|date|at`，value 为 SVG 字符串。
+
+    第三项 at 是已保存的案例时间，空字符串表示还没改过。
+    """
+    code_date_map = {code: d for code, d, _at in code_dates}
     bars_map = fetch_case_bars(code_date_map)
     out: dict[str, str] = {}
-    for code, d in code_date_map.items():
+    for code, d, at in code_dates:
         bars = bars_map.get(code)
-        svg = render_candle_svg(slice_window(bars, d), d) if bars is not None else None
-        out[f"{code}|{d}"] = svg or placeholder_svg()
+        window = slice_window(bars, at or d) if bars is not None else None
+        svg = render_candle_svg(window, d, at=at) if window is not None else None
+        out[f"{code}|{d}|{at}"] = svg or placeholder_svg()
     return out

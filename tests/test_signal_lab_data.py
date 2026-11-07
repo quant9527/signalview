@@ -37,6 +37,16 @@ def test_format_case_when_always_includes_clock():
     assert format_case_when("2026-04-03", None) == "2026.04.03"
 
 
+def test_case_signal_for_save_splits_pick_and_ban():
+    from app_pages.signal_lab import case_signal_for_save
+
+    assert case_signal_for_save("pick", "BUY") == "BUY"
+    assert case_signal_for_save("pick", "SELL") == "SELL"
+    assert case_signal_for_save("pick", "") == "BUY"
+    assert case_signal_for_save("ban", "BUY") == "NOT_BUY"
+    assert case_signal_for_save("ban", "SELL") == "NOT_BUY"
+
+
 def test_parse_case_when_accepts_dotted_clock():
     from datetime import datetime
 
@@ -84,6 +94,13 @@ def test_strategy_and_signal_options(cases):
     assert d.signal_options(cases) == ["BUY", "SELL"]
 
 
+def test_strategy_page_names_keeps_strategies_without_cases():
+    assert d.strategy_page_names(
+        ["bc_xd4"], ["bc_xd4", "xd3_reb2x_break_macd"],
+    ) == ["bc_xd4", "xd3_reb2x_break_macd"]
+    assert d.strategy_page_names(["orphan"], []) == ["orphan"]
+
+
 def test_rows_to_cases_maps_db_row():
     from datetime import datetime
 
@@ -106,11 +123,20 @@ def test_rows_to_cases_without_clock():
     assert d._rows_to_cases(rows)[0]["at"] == ""
 
 
+def test_case_title_uses_instrument_name():
+    assert d.case_title("as", "688549", ["中巨芯"]) == "中巨芯"
+    assert d.case_title("as", "000001", [None, " 平安银行 "]) == "平安银行"
+    with pytest.raises(ValueError, match="不存在"):
+        d.case_title("as", "000000", None)
+    with pytest.raises(ValueError, match="没有名称"):
+        d.case_title("as", "000000", ["", None])
+
+
 def test_prepare_new_case_checks_name_code_and_strategy():
     from datetime import datetime
 
     when = datetime(2026, 4, 3, 10, 30, 15)
-    with pytest.raises(ValueError, match="案例名称"):
+    with pytest.raises(ValueError, match="没有名称"):
         d.prepare_new_case("  ", "as:688549:1h", "bc", "BUY", when, strategy_known=True)
     with pytest.raises(ValueError, match="标的代码"):
         d.prepare_new_case("中巨芯", "688549", "bc", "BUY", when, strategy_known=True)

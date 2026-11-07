@@ -74,9 +74,9 @@ def load_cases(path: Path = DATA_PATH) -> list[dict]:
     return out
 
 
-@st.cache_data(ttl=600, max_entries=4, show_spinner=False)
+@st.cache_data(ttl=300, max_entries=4, show_spinner=False)
 def get_cases() -> list[dict]:
-    """页面入口：读 PG strategy_case 表（短缓存；写入后会清掉）。
+    """页面入口：读 PG strategy_case 表。短缓存。写入后清掉。
 
     连接/查询失败统一转 ValueError，页面层据此显示错误提示。
     """
@@ -170,6 +170,21 @@ def strategy_exists(name: str) -> bool:
         raise ValueError(f"PG 查询 strategy 失败：{e}") from e
 
 
+def delete_case(case_id: str) -> None:
+    """物理删除一条案例。不存在时抛 ValueError，不改其他行。"""
+    import psycopg
+
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM strategy_case WHERE id = %s", (case_id,))
+            changed = cur.rowcount
+    except psycopg.Error as e:
+        raise ValueError(f"删除案例失败：{e}") from e
+    if changed != 1:
+        raise ValueError("案例不存在，可能数据已更新。")
+    get_cases.clear()
+
+
 def update_case_when(case_id: str, when: datetime) -> None:
     """写入案例时间，并同步 signal_date 的日期部分。"""
     if when is None:
@@ -193,6 +208,37 @@ def update_case_when(case_id: str, when: datetime) -> None:
     get_cases.clear()
 
 
+def case_title(exchange: str, symbol: str, names: list[str | None] | None) -> str:
+    """用 instrument 表的名称作为案例标题。没有记录或名称为空时抛 ValueError。"""
+    label = f"{exchange}:{symbol}"
+    if names is None:
+        raise ValueError(f"标的「{label}」不存在")
+    for raw in names:
+        text = str(raw or "").strip()
+        if text:
+            return text
+    raise ValueError(f"标的「{label}」没有名称")
+
+
+def instrument_names(exchange: str, symbol: str) -> list[str | None] | None:
+    """instrument 表里这个交易所和代码的名称。没有记录时返回 None。"""
+    import psycopg
+
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT name FROM instrument "
+                "WHERE exchange = %s AND symbol = %s ORDER BY name",
+                (exchange, symbol),
+            )
+            rows = cur.fetchall()
+    except psycopg.Error as e:
+        raise ValueError(f"查询标的名称失败：{e}") from e
+    if not rows:
+        return None
+    return [row[0] for row in rows]
+
+
 def prepare_new_case(
     name: str,
     code: str,
@@ -204,13 +250,13 @@ def prepare_new_case(
     *,
     strategy_known: bool,
 ) -> dict:
-    """校验新增案例。策略不存在、代码或名称不合法时抛 ValueError，不写库。"""
-    cleaned_name = str(name or "").strip()
-    if not cleaned_name:
-        raise ValueError("请填写案例名称")
+    """校验新增案例。名称来自标的表，策略不存在或代码不合法时抛 ValueError，不写库。"""
     parsed = parse_code(code)
     if parsed is None:
-        raise ValueError("标的代码需要写成 交易所:代码:周期，例如 as:688549:1h")
+        raise ValueError("标的代码需要写成 交易所:代码:周期，例如 as:000001:1h")
+    cleaned_name = str(name or "").strip()
+    if not cleaned_name:
+        raise ValueError(f"标的「{parsed[0]}:{parsed[1]}」没有名称")
     cleaned_signal = str(signal or "").strip()
     if not cleaned_signal:
         raise ValueError("请选择信号")
@@ -229,7 +275,6 @@ def prepare_new_case(
 
 
 def insert_case(
-    name: str,
     code: str,
     strategy: str,
     signal: str,
@@ -237,9 +282,13 @@ def insert_case(
     info: str = "",
     note: str = "",
 ) -> str:
-    """写入一条案例，返回新 id。id 以 sv 开头，和飞书记录 id 分开。"""
+    """写入一条案例，返回生成的案例名称。名称按标的代码从 instrument 表生成。"""
+    parsed = parse_code(code)
+    title = ""
+    if parsed is not None:
+        title = case_title(parsed[0], parsed[1], instrument_names(parsed[0], parsed[1]))
     fields = prepare_new_case(
-        name, code, strategy, signal, when, info, note,
+        title, code, strategy, signal, when, info, note,
         strategy_known=strategy_exists(str(strategy or "").strip()),
     )
     case_id = "sv" + secrets.token_hex(8)
@@ -260,7 +309,7 @@ def insert_case(
     except psycopg.Error as e:
         raise ValueError(f"新增案例失败：{e}") from e
     get_cases.clear()
-    return case_id
+    return fields["name"]
 
 
 @st.cache_data(ttl=600, max_entries=2, show_spinner=False)
@@ -317,6 +366,13 @@ def paginate(
 
 def strategy_options(cases: list[dict]) -> list[str]:
     return sorted({str(c["strategy"]) for c in cases if c["strategy"]})
+
+
+def strategy_page_names(case_names: list[str], table_names: list[str]) -> list[str]:
+    """策略子页名单。没有案例的策略也保留，案例里多出来的名字一并算上。"""
+    names = {str(name).strip() for name in table_names if str(name or "").strip()}
+    names.update(str(name).strip() for name in case_names if str(name or "").strip())
+    return sorted(names)
 
 
 def signal_options(cases: list[dict]) -> list[str]:

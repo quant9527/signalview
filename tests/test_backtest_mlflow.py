@@ -39,6 +39,7 @@ def test_trades_to_cases_uses_entry_date_and_return():
     cases = trades_to_cases(frame)
     assert cases[0]["code"] == "ths:885877:2h"
     assert cases[0]["date"] == "2026-08-17"
+    assert cases[0]["at"] == "2026-08-17 11:30"
     assert cases[0]["signal"] == "BUY"
     assert cases[0]["strategy"] == "bc_xd4_macd_3b"
     assert cases[0]["name"] == "转基因"
@@ -46,3 +47,23 @@ def test_trades_to_cases_uses_entry_date_and_return():
     assert cases[1]["code"] == "binancespot:BTC:5m"
     assert cases[1]["signal"] == "SELL"
     assert cases[1]["info"].startswith("-25.00%")
+
+
+def test_related_strategy_names_follow_trade_signal_names():
+    from app_pages.backtest_mlflow import related_strategy_names, signal_names_from_frames
+
+    frame = pd.DataFrame({
+        "signal_name": [
+            "xd3_reb2x_break_macd",
+            "xd3_reb2x_break_ma5ma10",
+            "xd3_reb2x_break_macd",
+            "",
+        ],
+    })
+    names = signal_names_from_frames([frame, pd.DataFrame()])
+    assert names == ["xd3_reb2x_break_macd", "xd3_reb2x_break_ma5ma10"]
+    got = related_strategy_names(
+        names + ["xd3_reb2x_break_as_2026", "not_a_page"],
+        ["xd3_reb2x_break_macd", "xd3_reb2x_break_ma5ma10", "other"],
+    )
+    assert got == ["xd3_reb2x_break_ma5ma10", "xd3_reb2x_break_macd"]

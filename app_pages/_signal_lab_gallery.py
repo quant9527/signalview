@@ -35,7 +35,7 @@ def build_cards_payload(cases: list[dict], thumbs: dict[str, str]) -> list[dict]
     """把当前页案例 + 缩略图组装成组件 data；纯函数。"""
     cards = []
     for c in cases:
-        key = f"{c['code']}|{c['date']}"
+        key = f"{c['code']}|{c['date']}|{c.get('at') or ''}"
         cards.append({
             "id": str(c["id"]),
             "name": str(c["name"]),

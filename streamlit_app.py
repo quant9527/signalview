@@ -1,7 +1,7 @@
 """Streamlit entrypoint: registers section-grouped pages under app_pages/.
 
-案例库下的策略子页由 signal_lab_pages() 按案例数据动态注册，
-每个 url 固定一个策略。
+案例库下的策略子页由 signal_lab_pages() 按策略表动态注册，
+没有案例的策略也保留原地址。每个 url 固定一个策略。
 
 Each page is registered as an `st.Page` with a unique `url_path`, so the
 app uses Streamlit's path-based multipage navigation (`st.navigation`).
@@ -77,11 +77,11 @@ pages: dict[str, list[st.StreamlitPage]] = {
         st.Page(page_signal_bc_xd4, title="BC XD4", icon="📉",
                 url_path="signal_bc_xd4"),
     ],
-    "案例库": [
-        *signal_lab_pages(),
-    ],
     "回测": [
         *backtest_pages(),
+    ],
+    "案例库": [
+        *signal_lab_pages(),
     ],
     "K线": [
         st.Page(page_kline_fullscreen, title="K线", icon="🕯️", url_path="kline"),

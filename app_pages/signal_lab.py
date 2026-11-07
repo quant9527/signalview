@@ -83,15 +83,7 @@ def _case_chart_html_cached(code: str, date: str, at: str = "") -> tuple[str | N
         )
         if window is None or window.empty:
             return None, format_case_when(date, stored) if stored is not None else fallback
-        if stored is not None:
-            target = stored
-            pool = window
-        else:
-            target = pd.Timestamp(date)
-            # 案例只存了日期。优先落在当天的 K 线上，避免午夜就近落到前一根日终 bar。
-            same_day = window["_x"].dt.normalize() == target.normalize()
-            pool = window.loc[same_day] if bool(same_day.any()) else window
-        anchor = pool.loc[(pool["_x"] - target).abs().idxmin(), "_x"]
+        anchor = t.anchor_timestamp(window, date, at)
         when = format_case_when(date, stored if stored is not None else anchor)
         mark = kc.date_labels(pd.Series([pd.Timestamp(anchor)]), freq=freq)[0]
         labels = kc.date_labels(window["_x"], freq=freq)
@@ -158,6 +150,7 @@ def _live_case(case_id: str, fallback: dict | None) -> dict | None:
 def _dismiss_case_dialog() -> None:
     st.session_state["sl_dialog_open"] = False
     st.session_state["sl_edit"] = ""
+    st.session_state["sl_confirm_delete"] = ""
 
 
 def _cancel_edit(case_id: str) -> None:
@@ -247,7 +240,39 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
             st.info("K 线数据暂不可用（标的代码无法解析或数据源无此合约）。")
     shown = case["at"].replace("-", ".") if case.get("at") else when
     with right:
-        st.markdown(f"#### {case['name']}")
+        head = st.container(horizontal=True, vertical_alignment="center")
+        with head:
+            st.markdown(f"#### {case['name']}", width="stretch")
+            if editable and st.button(
+                "删除",
+                icon=":material/delete:",
+                type="tertiary",
+                key=f"sl_del_open_{case['id']}",
+            ):
+                st.session_state["sl_confirm_delete"] = case["id"]
+                st.rerun(scope="fragment")
+            elif st.session_state.get("sl_case_save"):
+                _save_trade_button(case)
+        if editable and st.session_state.get("sl_confirm_delete") == case["id"]:
+            st.warning(f"删除「{case['name']}」后不能恢复。")
+            if st.button(
+                "确认删除", type="primary", key=f"sl_del_yes_{case['id']}",
+                width="stretch",
+            ):
+                try:
+                    d.delete_case(case["id"])
+                except ValueError as e:
+                    st.error(str(e))
+                else:
+                    st.session_state["sl_dialog_open"] = False
+                    st.session_state["sl_confirm_delete"] = ""
+                    st.session_state["sl_edit"] = ""
+                    st.session_state.pop("sl_case_id", None)
+                    _case_chart_html_cached.clear()
+                    st.rerun()
+            if st.button("取消", key=f"sl_del_no_{case['id']}", width="stretch"):
+                st.session_state["sl_confirm_delete"] = ""
+                st.rerun(scope="fragment")
         if editable:
             _edit_when(case, shown)
         else:
@@ -264,6 +289,8 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
         ):
             st.markdown(f"**{label}**")
             st.markdown(str(value))
+        if st.session_state.get("sl_case_save"):
+            _save_trade_notice(case)
 
     # 翻页按钮：底部居中并排（左右留白对称）
     _, prev_b, next_b, _ = st.columns([2, 1, 1, 2])
@@ -272,10 +299,12 @@ def _show_case_dialog(cases_lookup: dict[str, dict]) -> None:
     if prev_b.button("← 上一个", key="sl_prev") and ids:
         st.session_state["sl_case_id"] = ids[(pos - 1) % len(ids)]
         st.session_state["sl_edit"] = ""
+        st.session_state["sl_confirm_delete"] = ""
         st.rerun(scope="fragment")
     if next_b.button("下一个 →", key="sl_next") and ids:
         st.session_state["sl_case_id"] = ids[(pos + 1) % len(ids)]
         st.session_state["sl_edit"] = ""
+        st.session_state["sl_confirm_delete"] = ""
         st.rerun(scope="fragment")
 
 
@@ -326,17 +355,10 @@ def _topbar(cases: list[dict], strategy: str) -> None:
     )
 
 
-_NEW_CASE_KEYS = (
-    "sl_new_name", "sl_new_when", "sl_new_code", "sl_new_strategy",
-    "sl_new_signal", "sl_new_info", "sl_new_note",
-)
-
-
 def _new_case_panel(cases: list[dict]) -> None:
     """全部策略页的新增案例，直接展示在图库上方。"""
-    if st.session_state.pop("sl_new_reset", False):
-        for key in _NEW_CASE_KEYS:
-            st.session_state.pop(key, None)
+    notice = st.session_state.pop("sl_new_notice", None)
+    gen = int(st.session_state.get("sl_new_gen", 0))
     try:
         strategies = d.list_strategy_names()
     except ValueError as e:
@@ -347,29 +369,32 @@ def _new_case_panel(cases: list[dict]) -> None:
         return
     signals = d.signal_options(cases) or ["BUY", "SELL"]
     st.subheader("新增案例")
-    with st.container(border=True):
-        with st.form("sl_new_case", clear_on_submit=False):
-            left, right = st.columns(2)
-            name = left.text_input("案例名称", key="sl_new_name")
-            when = right.datetime_input(
-                "时间", key="sl_new_when", step=timedelta(minutes=1),
-            )
-            code = left.text_input(
-                "标的代码", key="sl_new_code", placeholder="as:688549:1h",
-            )
-            signal = right.selectbox("信号", signals, key="sl_new_signal")
-            strategy = st.selectbox("策略", strategies, key="sl_new_strategy")
-            info = st.text_area("信息", key="sl_new_info", height=80)
-            note = st.text_area("注意点", key="sl_new_note", height=80)
-            submitted = st.form_submit_button("新增", type="primary")
-        if submitted:
-            try:
-                d.insert_case(name, code, strategy, signal, when, info, note)
-            except ValueError as e:
-                st.error(str(e))
-            else:
-                st.session_state["sl_new_reset"] = True
-                st.rerun()
+    if notice:
+        st.success(notice)
+        st.toast(notice)
+    with st.form("sl_new_case", clear_on_submit=False):
+        left, right = st.columns(2)
+        code = left.text_input(
+            "标的代码", key=f"sl_new_code_{gen}", placeholder="as:000001:1h",
+        )
+        when = right.datetime_input(
+            "时间", key=f"sl_new_when_{gen}", step=timedelta(minutes=1),
+        )
+        signal = left.selectbox("信号", signals, key=f"sl_new_signal_{gen}")
+        strategy = right.selectbox("策略", strategies, key=f"sl_new_strategy_{gen}")
+        info = st.text_area("信息", key=f"sl_new_info_{gen}", height=80)
+        note = st.text_area("注意点", key=f"sl_new_note_{gen}", height=80)
+        submitted = st.form_submit_button("新增", type="primary")
+    if submitted:
+        try:
+            title = d.insert_case(code, strategy, signal, when, info, note)
+        except ValueError as e:
+            st.error(str(e))
+            st.toast(str(e))
+        else:
+            st.session_state["sl_new_gen"] = gen + 1
+            st.session_state["sl_new_notice"] = f"已新增「{title}」"
+            st.rerun()
 
 
 def _render(strategy: str) -> None:
@@ -383,10 +408,6 @@ def _render(strategy: str) -> None:
             "请运行 scripts/migrate_signal_lab_to_pg.py 重新导入数据。"
         )
         return
-    if not cases and strategy != d.ALL_STRATEGY:
-        st.error("案例数据为空。")
-        return
-
     scoped = (
         cases if strategy == d.ALL_STRATEGY
         else [c for c in cases if c["strategy"] == strategy]
@@ -427,6 +448,7 @@ def _render(strategy: str) -> None:
         st.session_state.pop("sl_case_ids", None)
         st.session_state["sl_dialog_open"] = False
         st.session_state["sl_edit"] = ""
+        st.session_state["sl_confirm_delete"] = ""
 
     filtered = d.filter_cases(cases, strategy=strategy, keyword=keyword, signal=signal)
     render_case_gallery(filtered, key=gallery_key)
@@ -438,13 +460,71 @@ def _render(strategy: str) -> None:
     )
 
 
+def case_signal_for_save(action: str, trade_signal: str) -> str:
+    """回测成交写入案例时的信号。pick 沿用成交方向，ban 记成不应买入。"""
+    if action == "ban":
+        return "NOT_BUY"
+    cleaned = str(trade_signal or "").strip()
+    return cleaned or "BUY"
+
+
+def _save_trade_button(case: dict) -> None:
+    """回测详情标题旁的 pick / ban，样式与案例详情的删除按钮一致。"""
+    saved = st.session_state.get(f"sl_saved_{case['id']}")
+    if saved and saved[0] == "ok":
+        st.markdown(saved[1])
+        return
+
+    def _write(action: str, done: str) -> None:
+        try:
+            when = parse_case_when(case.get("at") or case.get("date") or "")
+            d.insert_case(
+                case.get("code") or "",
+                case.get("strategy") or "",
+                case_signal_for_save(action, case.get("signal") or ""),
+                when,
+                case.get("info") or "",
+                case.get("note") or "",
+            )
+        except ValueError as e:
+            st.session_state[f"sl_saved_{case['id']}"] = ("err", str(e))
+        else:
+            st.session_state[f"sl_saved_{case['id']}"] = ("ok", done)
+        st.rerun(scope="fragment")
+
+    if st.button(
+        "pick",
+        icon=":material/add:",
+        type="tertiary",
+        key=f"sl_save_pick_{case['id']}",
+        help="记成应出现的案例",
+    ):
+        _write("pick", "已 pick")
+    if st.button(
+        "ban",
+        icon=":material/block:",
+        type="tertiary",
+        key=f"sl_save_ban_{case['id']}",
+        help="记成不应买入的案例",
+    ):
+        _write("ban", "已 ban")
+
+
+def _save_trade_notice(case: dict) -> None:
+    saved = st.session_state.get(f"sl_saved_{case['id']}")
+    if saved and saved[0] == "err":
+        st.error(saved[1])
+
+
 def render_case_gallery(
-    cases: list[dict], *, key: str, cycle: str = "strategy", editable: bool = True,
+    cases: list[dict], *, key: str, cycle: str = "strategy",
+    editable: bool = True, save_case: bool = False,
 ) -> None:
     """案例 K 线卡片墙。回测页把成交映射成同样的 case 结构后调用。
 
     ``cycle="strategy"`` 时详情里上一个/下一个只在同一策略内翻；
     ``cycle="all"`` 时在传入的整份列表里翻。
+    ``save_case`` 只给回测页打开，详情里可以把这条成交写入策略案例表。
     """
     if not cases:
         st.info("没有可展示的记录。")
@@ -455,13 +535,16 @@ def render_case_gallery(
         cur_page = state["page"]
     page_cases, page_no, total_pages = d.paginate(cases, cur_page, PER_PAGE)
 
-    thumbs = t.thumbs_for_page(tuple((c["code"], c["date"]) for c in page_cases))
+    thumbs = t.thumbs_for_page(tuple(
+        (c["code"], c["date"], str(c.get("at") or "")) for c in page_cases
+    ))
     cards = g.build_cards_payload(page_cases, thumbs)
     result = g.render_gallery(cards, page_no, total_pages, key=key)
 
     # 点击卡片时记下打开状态。保存后整页重跑仍要留着弹窗；
     # 点 X 会清掉这个状态，之后的翻页和筛选不会再把弹窗带回来。
     st.session_state["sl_case_editable"] = editable
+    st.session_state["sl_case_save"] = save_case
     selected = getattr(result, "selected", None)
     if selected:
         by_id = {c["id"]: c for c in cases}
@@ -502,8 +585,9 @@ def page_for_strategy(strategy: str) -> Callable[[], None]:
 
 
 def signal_lab_pages() -> list[st.StreamlitPage]:
-    """案例库分区：全部策略 + 每个策略一个子页。
+    """案例库分区：全部策略 + 策略表里每个策略一个子页。
 
+    没有案例的策略也注册，否则删光案例后原来的地址会失效。
     案例库暂时读不到时只保留「全部策略」，页面内再提示错误，
     避免导航注册失败把整个应用拖垮。
     """
@@ -512,12 +596,20 @@ def signal_lab_pages() -> list[st.StreamlitPage]:
         st.Page(page_signal_lab, title="全部策略", icon="🔬", url_path="signal_lab"),
     ]
     try:
-        names = d.strategy_options(d.get_cases())
+        case_names = d.strategy_options(d.get_cases())
     except Exception as e:
         if not _NAV_WARNED:
             print(f"[SignalLab] 策略子页未注册：{e}")
             _NAV_WARNED = True
         return pages
+    try:
+        table_names = d.list_strategy_names()
+    except Exception as e:
+        if not _NAV_WARNED:
+            print(f"[SignalLab] 策略表读不到，子页只按案例注册：{e}")
+            _NAV_WARNED = True
+        table_names = []
+    names = d.strategy_page_names(case_names, table_names)
     seen = {"signal_lab"}
     for name in names:
         url_path = f"signal_lab_{name}"
